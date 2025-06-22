@@ -1,28 +1,40 @@
 {
-	"version": "2.0.0",
-	"tasks": [
-		{
-			"type": "cppbuild",
-			"label": "C/C++: g++.exe build active file",
-			"command": "C:\\msys64\\mingw64\\bin\\g++.exe",
-			"args": [
-				"-fdiagnostics-color=always",
-				"-g",
-				"${file}",
-				"-o",
-				"${fileDirname}\\${fileBasenameNoExtension}.exe"
-			],
-			"options": {
-				"cwd": "C:\\msys64\\mingw64\\bin"
-			},
-			"problemMatcher": [
-				"$gcc"
-			],
-			"group": {
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "type": "cppbuild",
+            "label": "C/C++: g++.exe build active file",
+            "command": "C:\\msys64\\mingw64\\bin\\g++.exe",
+            "args": [
+                "-fdiagnostics-color=always",
+                "-g",
+                "${file}", // main.cpp はそのまま (VS Codeが自動で適切なパスを生成)
+                // glad.c のパスをバックスラッシュに統一
+                "${workspaceFolder}\\dependencies\\lib\\glad.c",
+                "-o",
+                "${fileDirname}\\${fileBasenameNoExtension}.exe",
+                // ヘッダーファイルの検索パスをバックスラッシュに統一
+                "-I${workspaceFolder}\\dependencies\\include",
+                // ライブラリファイルの検索パスをバックスラッシュに統一
+                "-L${workspaceFolder}\\dependencies\\lib",
+                // リンクするライブラリ
+                "-lglfw3",
+                "-lgdi32",
+                "-lopengl32",
+                "-luser32",
+                "-lkernel32"
+            ],
+            "options": {
+                "cwd": "${fileDirname}"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
                 "kind": "build",
-                "isDefault": true // ★ この行を追加！
+                "isDefault": true
             },
             "detail": "compiler: C:\\msys64\\mingw64\\bin\\g++.exe"
-		}
-	]
+        }
+    ]
 }
