@@ -8,24 +8,27 @@
             "args": [
                 "-fdiagnostics-color=always",
                 "-g",
-                "${file}", // main.cpp はそのまま (VS Codeが自動で適切なパスを生成)
-                // glad.c のパスをバックスラッシュに統一
+                "${workspaceFolder}\\main.cpp",
                 "${workspaceFolder}\\dependencies\\lib\\glad.c",
                 "-o",
                 "${fileDirname}\\${fileBasenameNoExtension}.exe",
-                // ヘッダーファイルの検索パスをバックスラッシュに統一
                 "-I${workspaceFolder}\\dependencies\\include",
-                // ライブラリファイルの検索パスをバックスラッシュに統一
                 "-L${workspaceFolder}\\dependencies\\lib",
-                // リンクするライブラリ
                 "-lglfw3",
                 "-lgdi32",
                 "-lopengl32",
                 "-luser32",
-                "-lkernel32"
+                "-lkernel32",
+                "-lmingw32", // MinGW固有のユーティリティライブラリ
+                "-lmsvcrt",   // Microsoft Visual C Runtime (GCCがこれにリンクすることが多い)
+                "-lm"         // 数学関数を使用する場合に必要 (fmaxf, fminfなど)
             ],
             "options": {
-                "cwd": "${fileDirname}"
+                "cwd": "${fileDirname}",
+                "shell": {
+                    "executable": "C:\\Program Files\\Git\\bin\\bash.exe",
+                    "args": ["-c"]
+                }
             },
             "problemMatcher": [
                 "$gcc"

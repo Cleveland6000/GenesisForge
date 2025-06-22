@@ -1,6 +1,14 @@
+// settings.json
 {
     "files.associations": {
         "ostream": "cpp",
         "iostream": "cpp"
-    }
+    },
+    "terminal.integrated.profiles.windows": {
+        "Git Bash": {
+            "path": "C:\\Program Files\\Git\\bin\\bash.exe",
+            "icon": "terminal-bash" // これはオプションですが、あると識別しやすくなります
+        }
+    },
+    "terminal.integrated.defaultProfile.windows": "Git Bash"
 }
