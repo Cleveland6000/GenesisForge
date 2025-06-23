@@ -6,26 +6,24 @@ FullscreenManager::FullscreenManager()
 {
 }
 
-void FullscreenManager::toggleFullscreen(GLFWwindow *window, int currentWidth, int currentHeight)
+void FullscreenManager::toggleFullscreen(GLFWwindow *window)
 {
     if (m_isFullscreen)
     {
         // フルスクリーン -> ウィンドウモード
-        glfwSetWindowMonitor(window, NULL, // NULL を渡すとウィンドウモードになる
+        glfwSetWindowMonitor(window, NULL,
                              m_windowedX, m_windowedY,
                              m_windowedWidth, m_windowedHeight,
-                             GLFW_DONT_CARE); // リフレッシュレートは気にしない
+                             GLFW_DONT_CARE);
 
         m_isFullscreen = false;
     }
     else
     {
         // ウィンドウモード -> フルスクリーン
-        // 現在のウィンドウの位置とサイズを保存
         glfwGetWindowPos(window, &m_windowedX, &m_windowedY);
         glfwGetWindowSize(window, &m_windowedWidth, &m_windowedHeight);
 
-        // プライマリモニターを取得
         GLFWmonitor *primaryMonitor = glfwGetPrimaryMonitor();
         if (!primaryMonitor)
         {
@@ -41,22 +39,21 @@ void FullscreenManager::toggleFullscreen(GLFWwindow *window, int currentWidth, i
         }
 
         glfwSetWindowMonitor(window, primaryMonitor,
-                             0, 0,                      // フルスクリーンなので位置は(0,0)
-                             mode->width, mode->height, // モニターの解像度
-                             mode->refreshRate);        // モニターのリフレッシュレート
+                             0, 0,
+                             mode->width, mode->height,
+                             mode->refreshRate);
 
         m_isFullscreen = true;
     }
 
-    // モード切り替え後、フレームバッファサイズが変わる可能性があるので、
-    // ここでApplication::updateProjectionMatrixを呼び出すためにApplicationインスタンスを取得し、
-    // そのメソッドを呼び出す。
-    // または、FullscreenManagerがイベントを発行し、Applicationがそれを受け取るような設計も考えられます。
-    // 今回は簡略化のため、Applicationクラスに依存する形で実装します。
+    int actualWidth, actualHeight;
+    glfwGetFramebufferSize(window, &actualWidth, &actualHeight);
+
     Application *app = static_cast<Application *>(glfwGetWindowUserPointer(window));
     if (app)
     {
-        app->updateProjectionMatrix(currentWidth, currentHeight); // ウィンドウサイズは変わる可能性があるが、現在の値でプロジェクションを更新
+        app->updateProjectionMatrix(actualWidth, actualHeight);
+        app->resetMouseState(); // 【追加】フルスクリーン切り替え後にマウス状態をリセット
     }
-    glViewport(0, 0, currentWidth, currentHeight); // Viewportも更新
+    glViewport(0, 0, actualWidth, actualHeight);
 }

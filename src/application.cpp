@@ -195,14 +195,13 @@ void Application::processInput()
     }
 
     static bool f11_pressed_last_frame = false;
+    // application.cpp の Application::processInput() 内
     if (glfwGetKey(m_window.get(), GLFW_KEY_F11) == GLFW_PRESS)
     {
         if (!f11_pressed_last_frame)
         {
-            int width, height;
-            glfwGetFramebufferSize(m_window.get(), &width, &height);
-            // FullscreenManagerのメソッドを呼び出す
-            m_fullscreenManager.toggleFullscreen(m_window.get(), width, height);
+            // 引数から width, height を削除
+            m_fullscreenManager.toggleFullscreen(m_window.get());
         }
         f11_pressed_last_frame = true;
     }
@@ -256,7 +255,20 @@ void Application::update()
         }
     }
 }
+// application.cpp のどこかに resetMouseState メソッドを追加
+void Application::resetMouseState()
+{
+    // 現在のウィンドウの中心にマウスカーソルを再配置する
+    int width, height;
+    glfwGetFramebufferSize(m_window.get(), &width, &height);
 
+    m_lastX = static_cast<float>(width) / 2.0f;
+    m_lastY = static_cast<float>(height) / 2.0f;
+    m_firstMouse = true; // 次のマウス入力は「最初」として扱う
+
+    // GLFWにカーソル位置をセットする
+    glfwSetCursorPos(m_window.get(), m_lastX, m_lastY);
+}
 // 描画処理
 void Application::render()
 {

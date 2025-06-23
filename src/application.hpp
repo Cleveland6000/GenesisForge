@@ -1,11 +1,9 @@
 #ifndef APPLICATION_HPP
 #define APPLICATION_HPP
 
-// GLFWがgl.hをインクルードするのを防ぐために、gladの前に定義
-#define GLFW_INCLUDE_NONE 
+#define GLFW_INCLUDE_NONE
 #include <glad/glad.h>
-#include <GLFW/glfw3.h> // gladの後にインクルードする
-
+#include <GLFW/glfw3.h>
 #include <memory>
 #include <vector>
 
@@ -14,7 +12,7 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include "camera.hpp"
-#include "fullscreen_manager.hpp" 
+#include "fullscreen_manager.hpp"
 
 // ウィンドウの初期サイズ
 const unsigned int SCR_WIDTH = 800;
@@ -29,8 +27,10 @@ public:
     bool initialize();
     void run();
 
-    // publicにしてFullscreenManagerからアクセスできるようにする
     void updateProjectionMatrix(int width, int height);
+
+    // 【追加】マウス状態をリセットするパブリックメソッド
+    void resetMouseState();
 
 private:
     // クリアカラーの静的定数
