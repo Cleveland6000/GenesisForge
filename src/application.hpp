@@ -33,13 +33,27 @@ private:
 
     glm::mat4 m_projectionMatrix;
     std::vector<glm::vec3> m_cubePositions;
-    
+
+    bool m_isFullscreen = false; // 現在フルスクリーンモードかどうか
+    int m_windowedX;             // ウィンドウモード時のX座標
+    int m_windowedY;             // ウィンドウモード時のY座標
+    int m_windowedWidth;         // ウィンドウモード時の幅
+    int m_windowedHeight;        // ウィンドウモード時の高さ
+
+    glm::vec3 m_cameraPos;
+    glm::vec3 m_cameraFront;
+    glm::vec3 m_cameraUp;
+    float m_cameraSpeed;
+
+    float m_deltaTime = 0.0f; // 前フレームからの時間差
+    float m_lastFrame = 0.0f; // 前フレームの時間
+
     void processInput();
     void update();
     void render();
 
     void updateProjectionMatrix(int width, int height);
-
+    void toggleFullscreen();
     static void staticFramebufferSizeCallback(GLFWwindow *window, int width, int height);
 };
 
