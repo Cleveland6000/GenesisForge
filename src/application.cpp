@@ -1,7 +1,8 @@
 #include <glad/glad.h>
-#include "application.hpp"
+#include "application.hpp" // application.hpp をインクルード
 #include <iostream>
 #include "opengl_utils.hpp" // createShaderProgram関数があるヘッダー
+#include "camera.hpp"       // Cameraクラスをインクルード
 
 // 静的メンバ変数の初期化
 const float Application::CLEAR_COLOR_R = 0.0f;
@@ -13,10 +14,7 @@ const float Application::CLEAR_COLOR_A = 1.0f;
 Application::Application()
     : m_window(nullptr, glfwDestroyWindow),
       m_VAO(0), m_VBO(0), m_EBO(0), m_shaderProgram(0),
-      m_cameraPos(glm::vec3(0.0f, 0.0f, 3.0f)),
-      m_cameraFront(glm::vec3(0.0f, 0.0f, -1.0f)),
-      m_cameraUp(glm::vec3(0.0f, 1.0f, 0.0f)),
-      m_cameraSpeed(2.5f)
+      m_camera(glm::vec3(0.0f, 0.0f, 3.0f)) // カメラを初期位置に設定
 {
 }
 
@@ -65,6 +63,13 @@ bool Application::initialize()
     glfwSetWindowUserPointer(m_window.get(), this);
     // 新しい静的コールバック関数を設定
     glfwSetFramebufferSizeCallback(m_window.get(), Application::staticFramebufferSizeCallback);
+    // マウス入力コールバックを設定
+    glfwSetCursorPosCallback(m_window.get(), Application::staticMouseCallback); // 追加
+    // スクロール入力コールバックを設定
+    glfwSetScrollCallback(m_window.get(), Application::staticScrollCallback); // 追加
+
+    // マウスカーソルを非表示にし、中心に固定
+    glfwSetInputMode(m_window.get(), GLFW_CURSOR, GLFW_CURSOR_DISABLED); // 追加
 
     // 初期ビューポートと投影行列を設定
     int initialWidth, initialHeight;
@@ -76,24 +81,24 @@ bool Application::initialize()
 
     // --- 立方体の頂点データと色データ (共有頂点に修正) ---
     float vertices[] = {
-        // 位置 (XYZ)         色 (RGB)
+        // 位置 (XYZ)            色 (RGB)
         // 0: 右上奥
-        0.5f, 0.5f, -0.5f, 1.0f, 0.0f, 0.0f,  // 赤
-                                              // 1: 右下奥
-        0.5f, -0.5f, -0.5f, 0.0f, 1.0f, 0.0f, // 緑
+        0.5f, 0.5f, -0.5f, 1.0f, 0.0f, 0.0f,   // 赤
+                                               // 1: 右下奥
+        0.5f, -0.5f, -0.5f, 0.0f, 1.0f, 0.0f,  // 緑
         // 2: 左下奥
         -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 1.0f, // 青
         // 3: 左上奥
-        -0.5f, 0.5f, -0.5f, 1.0f, 1.0f, 0.0f, // 黄
+        -0.5f, 0.5f, -0.5f, 1.0f, 1.0f, 0.0f,  // 黄
 
         // 4: 右上手前
-        0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 1.0f,  // シアン
-                                             // 5: 右下手前
-        0.5f, -0.5f, 0.5f, 1.0f, 0.0f, 1.0f, // マゼンタ
+        0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 1.0f,    // シアン
+                                               // 5: 右下手前
+        0.5f, -0.5f, 0.5f, 1.0f, 0.0f, 1.0f,   // マゼンタ
         // 6: 左下手前
-        -0.5f, -0.5f, 0.5f, 0.5f, 0.5f, 0.5f, // 灰色
+        -0.5f, -0.5f, 0.5f, 0.5f, 0.5f, 0.5f,  // 灰色
         // 7: 左上手前
-        -0.5f, 0.5f, 0.5f, 0.8f, 0.2f, 0.6f // 紫
+        -0.5f, 0.5f, 0.5f, 0.8f, 0.2f, 0.6f    // 紫
     };
 
     // インデックスデータ (修正)
@@ -152,11 +157,11 @@ bool Application::initialize()
     }
 
     // --- 複数の立方体の位置を初期化 ---
-    m_cubePositions.push_back(glm::vec3(0.0f, 0.0f, -3.0f));  // 中央
-    m_cubePositions.push_back(glm::vec3(2.0f, 0.0f, -3.0f));  // 右
-    m_cubePositions.push_back(glm::vec3(-2.0f, 0.0f, -3.0f)); // 左
-    m_cubePositions.push_back(glm::vec3(0.0f, 2.0f, -3.0f));  // 上
-    m_cubePositions.push_back(glm::vec3(0.0f, -2.0f, -3.0f)); // 下
+    m_cubePositions.push_back(glm::vec3(0.0f, 0.0f, -3.0f));   // 中央
+    m_cubePositions.push_back(glm::vec3(2.0f, 0.0f, -3.0f));   // 右
+    m_cubePositions.push_back(glm::vec3(-2.0f, 0.0f, -3.0f));  // 左
+    m_cubePositions.push_back(glm::vec3(0.0f, 2.0f, -3.0f));   // 上
+    m_cubePositions.push_back(glm::vec3(0.0f, -2.0f, -3.0f));  // 下
     // もっと追加しても良い
     m_cubePositions.push_back(glm::vec3(1.0f, 1.0f, -4.0f));
     m_cubePositions.push_back(glm::vec3(-1.0f, -1.0f, -2.0f));
@@ -200,34 +205,31 @@ void Application::processInput()
         f11_pressed_last_frame = false;
     }
 
-    // --- ここから追加: WASDキーによる移動 ---
-    float velocity = m_cameraSpeed * m_deltaTime; // フレームレートに依存しない移動量
+    // --- WASDキーによる移動 (Cameraクラスに処理を委譲) ---
     if (glfwGetKey(m_window.get(), GLFW_KEY_W) == GLFW_PRESS)
     {
-        m_cameraPos += m_cameraFront * velocity; // 前方へ移動
+        m_camera.processKeyboard(FORWARD, m_deltaTime);
     }
     if (glfwGetKey(m_window.get(), GLFW_KEY_S) == GLFW_PRESS)
     {
-        m_cameraPos -= m_cameraFront * velocity; // 後方へ移動
+        m_camera.processKeyboard(BACKWARD, m_deltaTime);
     }
     if (glfwGetKey(m_window.get(), GLFW_KEY_A) == GLFW_PRESS)
     {
-        // 左右への移動は、カメラの正面ベクトルと上方向ベクトルの外積（右方向ベクトル）を使用
-        m_cameraPos -= glm::normalize(glm::cross(m_cameraFront, m_cameraUp)) * velocity; // 左へ移動
+        m_camera.processKeyboard(LEFT, m_deltaTime);
     }
     if (glfwGetKey(m_window.get(), GLFW_KEY_D) == GLFW_PRESS)
     {
-        m_cameraPos += glm::normalize(glm::cross(m_cameraFront, m_cameraUp)) * velocity; // 右へ移動
+        m_camera.processKeyboard(RIGHT, m_deltaTime);
     }
 }
 
 // 更新処理
 void Application::update()
 {
-
     float currentFrame = static_cast<float>(glfwGetTime());
     m_deltaTime = currentFrame - m_lastFrame; // 前フレームからの時間差を計算
-    m_lastFrame = currentFrame;               // 現在のフレーム時間を保存
+    m_lastFrame = currentFrame;                // 現在のフレーム時間を保存
     // 必要に応じてロジックを追加（例：カメラ移動、オブジェクトのアニメーションなど）
 
     // Application::update() の中 (m_deltaTime, m_lastFrame の計算後)
@@ -260,10 +262,8 @@ void Application::render()
     // 投影行列は毎フレーム送る（リサイズ対応のため）
     glUniformMatrix4fv(glGetUniformLocation(m_shaderProgram, "projection"), 1, GL_FALSE, glm::value_ptr(m_projectionMatrix));
 
-    // ビュー行列 (現時点では固定だが、カメラ移動を実装するならここを更新)
-    glm::mat4 view = glm::lookAt(m_cameraPos,                 // カメラの位置
-                                 m_cameraPos + m_cameraFront, // カメラの注視点 (カメラ位置 + 前方ベクトル)
-                                 m_cameraUp);                 // カメラの上方向
+    // ビュー行列をカメラから取得
+    glm::mat4 view = m_camera.getViewMatrix(); // Cameraクラスからビュー行列を取得
     glUniformMatrix4fv(glGetUniformLocation(m_shaderProgram, "view"), 1, GL_FALSE, glm::value_ptr(view));
 
     glBindVertexArray(m_VAO); // 一度バインドすればOK
@@ -277,7 +277,7 @@ void Application::render()
 
         // (オプション) 各立方体に異なる回転を適用する例
         // 時間経過 + インデックスによるオフセットで個別の回転アニメーション
-        float angle = (float)glfwGetTime() * 25.0f * (i + 1);                         // インデックスによって回転速度を変える
+        float angle = (float)glfwGetTime() * 25.0f * (i + 1);                       // インデックスによって回転速度を変える
         model = glm::rotate(model, glm::radians(angle), glm::vec3(0.5f, 1.0f, 0.0f)); // Y軸とX軸の間で回転
 
         // モデル行列をシェーダーに送る
@@ -308,11 +308,43 @@ void Application::updateProjectionMatrix(int width, int height)
         return;
     }
     float aspectRatio = (float)width / (float)height;
-    m_projectionMatrix = glm::perspective(glm::radians(45.0f), // 視野角 (FOV) 45度
-                                          aspectRatio,         // 新しいアスペクト比
-                                          0.1f,                // near clipping plane
-                                          100.0f);             // far clipping plane
+    m_projectionMatrix = glm::perspective(glm::radians(m_camera.Zoom), // カメラのZoomを使用
+                                          aspectRatio,                 // 新しいアスペクト比
+                                          0.1f,                        // near clipping plane
+                                          100.0f);                     // far clipping plane
 }
+
+// マウス移動コールバック
+void Application::staticMouseCallback(GLFWwindow* window, double xposIn, double yposIn) {
+    Application* app = static_cast<Application*>(glfwGetWindowUserPointer(window));
+    if (app) {
+        float xpos = static_cast<float>(xposIn);
+        float ypos = static_cast<float>(yposIn);
+
+        if (app->m_firstMouse) {
+            app->m_lastX = xpos;
+            app->m_lastY = ypos;
+            app->m_firstMouse = false;
+        }
+
+        float xoffset = xpos - app->m_lastX;
+        float yoffset = app->m_lastY - ypos; // Y軸は下方向が正なので反転させる
+
+        app->m_lastX = xpos;
+        app->m_lastY = ypos;
+
+        app->m_camera.processMouseMovement(xoffset, yoffset);
+    }
+}
+
+// マウススクロールコールバック
+void Application::staticScrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
+    Application* app = static_cast<Application*>(glfwGetWindowUserPointer(window));
+    if (app) {
+        app->m_camera.processMouseScroll(static_cast<float>(yoffset));
+    }
+}
+
 
 void Application::toggleFullscreen()
 {
@@ -349,9 +381,9 @@ void Application::toggleFullscreen()
         }
 
         glfwSetWindowMonitor(m_window.get(), primaryMonitor,
-                             0, 0,                      // フルスクリーンなので位置は(0,0)
-                             mode->width, mode->height, // モニターの解像度
-                             mode->refreshRate);        // モニターのリフレッシュレート
+                             0, 0,                          // フルスクリーンなので位置は(0,0)
+                             mode->width, mode->height,     // モニターの解像度
+                             mode->refreshRate);            // モニターのリフレッシュレート
 
         m_isFullscreen = true;
     }

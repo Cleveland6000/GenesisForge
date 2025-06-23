@@ -1,60 +1,74 @@
 #ifndef APPLICATION_HPP
 #define APPLICATION_HPP
 
+#include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <vector>
+#include <string>
 #include <memory>
-#include "opengl_utils.hpp"
-#include <vector> // std::vector を使用する場合
 
-class Application
-{
+#include "camera.hpp" // Cameraクラスをインクルード
+
+// ウィンドウの初期サイズ
+const unsigned int SCR_WIDTH = 800;
+const unsigned int SCR_HEIGHT = 600;
+
+class Application {
 public:
     Application();
     ~Application();
+
     bool initialize();
     void run();
 
 private:
-    std::unique_ptr<GLFWwindow, decltype(&glfwDestroyWindow)> m_window;
+    // 静的コールバック関数
+    static void staticFramebufferSizeCallback(GLFWwindow* window, int width, int height);
+    static void staticMouseCallback(GLFWwindow* window, double xpos, double ypos); // 追加
+    static void staticScrollCallback(GLFWwindow* window, double xoffset, double yoffset); // 追加
 
-    static const unsigned int SCR_WIDTH = 800;
-    static const unsigned int SCR_HEIGHT = 600;
+    // Applicationクラス内のメソッド
+    void processInput();
+    void update();
+    void render();
+    void updateProjectionMatrix(int width, int height);
+    void toggleFullscreen();
+
+    // ウィンドウ関連
+    std::unique_ptr<GLFWwindow, decltype(&glfwDestroyWindow)> m_window;
+    int m_windowedX, m_windowedY, m_windowedWidth, m_windowedHeight;
+    bool m_isFullscreen = false;
+
+    // OpenGLオブジェクトID
+    unsigned int m_VAO, m_VBO, m_EBO;
+    unsigned int m_shaderProgram;
+
+    // プロジェクション行列
+    glm::mat4 m_projectionMatrix;
+
+    // --- カメラ関連のメンバ変数をCameraクラスのインスタンスに置き換え ---
+    Camera m_camera;
+
+    // キューブの位置
+    std::vector<glm::vec3> m_cubePositions;
+
+    // 時間計算用
+    float m_deltaTime = 0.0f;
+    float m_lastFrame = 0.0f;
+
+    // マウス入力用
+    bool m_firstMouse = true;
+    float m_lastX = SCR_WIDTH / 2.0f;
+    float m_lastY = SCR_HEIGHT / 2.0f;
+
+    // クリアカラー
     static const float CLEAR_COLOR_R;
     static const float CLEAR_COLOR_G;
     static const float CLEAR_COLOR_B;
     static const float CLEAR_COLOR_A;
-
-    unsigned int m_VAO;
-    unsigned int m_VBO;
-    unsigned int m_EBO;
-    unsigned int m_shaderProgram;
-
-    bool m_projectionNeedsUpdate;
-
-    glm::mat4 m_projectionMatrix;
-    std::vector<glm::vec3> m_cubePositions;
-
-    bool m_isFullscreen = false; // 現在フルスクリーンモードかどうか
-    int m_windowedX;             // ウィンドウモード時のX座標
-    int m_windowedY;             // ウィンドウモード時のY座標
-    int m_windowedWidth;         // ウィンドウモード時の幅
-    int m_windowedHeight;        // ウィンドウモード時の高さ
-
-    glm::vec3 m_cameraPos;
-    glm::vec3 m_cameraFront;
-    glm::vec3 m_cameraUp;
-    float m_cameraSpeed;
-
-    float m_deltaTime = 0.0f; // 前フレームからの時間差
-    float m_lastFrame = 0.0f; // 前フレームの時間
-
-    void processInput();
-    void update();
-    void render();
-
-    void updateProjectionMatrix(int width, int height);
-    void toggleFullscreen();
-    static void staticFramebufferSizeCallback(GLFWwindow *window, int width, int height);
 };
 
-#endif // APPLICATION_HPP
+#endif
