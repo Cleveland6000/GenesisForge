@@ -4,6 +4,7 @@
 #include <GLFW/glfw3.h>
 #include <memory>
 #include "opengl_utils.hpp"
+#include <vector> // std::vector を使用する場合
 
 class Application
 {
@@ -28,10 +29,18 @@ private:
     unsigned int m_EBO;
     unsigned int m_shaderProgram;
 
+    bool m_projectionNeedsUpdate;
+
+    glm::mat4 m_projectionMatrix;
+    std::vector<glm::vec3> m_cubePositions;
+    
     void processInput();
     void update();
     void render();
-    
+
+    void updateProjectionMatrix(int width, int height);
+
+    static void staticFramebufferSizeCallback(GLFWwindow *window, int width, int height);
 };
 
 #endif // APPLICATION_HPP

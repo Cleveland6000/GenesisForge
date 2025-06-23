@@ -3,13 +3,13 @@
     "tasks": [
         {
             "type": "cppbuild",
-            "label": "C/C++: g++.exe build active file",
+            "label": "Build OpenGL App Only",
             "command": "C:\\msys64\\mingw64\\bin\\g++.exe",
             "args": [
                 "-fdiagnostics-color=always",
                 "-g",
                 "${workspaceFolder}\\src\\*.cpp",
-                "${workspaceFolder}\\src\\*.c", 
+                "${workspaceFolder}\\src\\*.c",
                 "-o",
                 "${workspaceFolder}\\build\\opengl_app.exe",
                 "-I${workspaceFolder}\\src",
@@ -20,15 +20,17 @@
                 "-lopengl32",
                 "-luser32",
                 "-lkernel32",
-                "-lmingw32", // MinGW固有のユーティリティライブラリ
-                "-lmsvcrt",   // Microsoft Visual C Runtime (GCCがこれにリンクすることが多い)
-                "-lm"         // 数学関数を使用する場合に必要 (fmaxf, fminfなど)
+                "-lmingw32",
+                "-lmsvcrt",
+                "-lm"
             ],
             "options": {
-                "cwd": "${fileDirname}",
+                "cwd": "${workspaceFolder}",
                 "shell": {
                     "executable": "C:\\Program Files\\Git\\bin\\bash.exe",
-                    "args": ["-c"]
+                    "args": [
+                        "-c"
+                    ]
                 }
             },
             "problemMatcher": [
@@ -36,9 +38,53 @@
             ],
             "group": {
                 "kind": "build",
+                "isDefault": false
+            },
+            "detail": "compiler: C:\\msys64\\mingw64\\bin\\g++.exe",
+            "presentation": { // ビルド中にターミナル表示
+                "reveal": "always",
+                "panel": "shared", // 共有パネルにして、次の実行結果も同じパネルに表示
+                "clear": true // ビルド前にターミナルをクリア
+            }
+        },
+        {
+            "label": "Run OpenGL App Only",
+            "type": "process",
+            "command": "${workspaceFolder}\\build\\opengl_app.exe",
+            "options": {
+                "cwd": "${workspaceFolder}\\build",
+                "shell": {
+                    "executable": "C:\\Program Files\\Git\\bin\\bash.exe",
+                    "args": [
+                        "-c"
+                    ]
+                }
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "problemMatcher": [],
+            "detail": "Runs the compiled OpenGL application.",
+            "presentation": { // 実行中にターミナル表示（ビルドと同じパネル）
+                "reveal": "always",
+                "panel": "shared",
+                "clear": false // 前のビルドログを残すためにクリアしない
+            }
+        },
+        {
+            "label": "Build and Run OpenGL App",
+            "dependsOn": [
+                "Build OpenGL App Only",
+                "Run OpenGL App Only"
+            ],
+            "dependsOrder": "sequence", // ここが重要！依存タスクを順番に実行させる
+            "group": {
+                "kind": "build",
                 "isDefault": true
             },
-            "detail": "compiler: C:\\msys64\\mingw64\\bin\\g++.exe"
+            "detail": "Builds the OpenGL application and then runs it.",
+            "problemMatcher": []
         }
     ]
 }
