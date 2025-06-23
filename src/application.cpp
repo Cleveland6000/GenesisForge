@@ -3,6 +3,7 @@
 #include <iostream>
 #include "opengl_utils.hpp" // createShaderProgram関数があるヘッダー
 #include "camera.hpp"       // Cameraクラスをインクルード
+// #include "fullscreen_manager.hpp" // application.hpp でインクルード済みなので不要
 
 // 静的メンバ変数の初期化
 const float Application::CLEAR_COLOR_R = 0.0f;
@@ -15,6 +16,7 @@ Application::Application()
     : m_window(nullptr, glfwDestroyWindow),
       m_VAO(0), m_VBO(0), m_EBO(0), m_shaderProgram(0),
       m_camera(glm::vec3(0.0f, 0.0f, 3.0f)) // カメラを初期位置に設定
+                                            // m_fullscreenManagerはデフォルトコンストラクタで初期化される
 {
 }
 
@@ -50,8 +52,9 @@ bool Application::initialize()
 
     glfwMakeContextCurrent(m_window.get());
 
-    glfwGetWindowPos(m_window.get(), &m_windowedX, &m_windowedY);
-    glfwGetWindowSize(m_window.get(), &m_windowedWidth, &m_windowedHeight);
+    // FullscreenManagerに初期のウィンドウサイズを渡し、内部で保持させることもできるが、
+    // ここでは直接GLFWから取得する形を維持
+    // m_fullscreenManager.setInitialWindowParams(SCR_WIDTH, SCR_HEIGHT, 0, 0); // 必要であれば
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
@@ -81,24 +84,24 @@ bool Application::initialize()
 
     // --- 立方体の頂点データと色データ (共有頂点に修正) ---
     float vertices[] = {
-        // 位置 (XYZ)            色 (RGB)
+        // 位置 (XYZ)               色 (RGB)
         // 0: 右上奥
-        0.5f, 0.5f, -0.5f, 1.0f, 0.0f, 0.0f,   // 赤
-                                               // 1: 右下奥
-        0.5f, -0.5f, -0.5f, 0.0f, 1.0f, 0.0f,  // 緑
+        0.5f, 0.5f, -0.5f, 1.0f, 0.0f, 0.0f,  // 赤
+                                              // 1: 右下奥
+        0.5f, -0.5f, -0.5f, 0.0f, 1.0f, 0.0f, // 緑
         // 2: 左下奥
         -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 1.0f, // 青
         // 3: 左上奥
-        -0.5f, 0.5f, -0.5f, 1.0f, 1.0f, 0.0f,  // 黄
+        -0.5f, 0.5f, -0.5f, 1.0f, 1.0f, 0.0f, // 黄
 
         // 4: 右上手前
-        0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 1.0f,    // シアン
-                                               // 5: 右下手前
-        0.5f, -0.5f, 0.5f, 1.0f, 0.0f, 1.0f,   // マゼンタ
+        0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 1.0f,  // シアン
+                                             // 5: 右下手前
+        0.5f, -0.5f, 0.5f, 1.0f, 0.0f, 1.0f, // マゼンタ
         // 6: 左下手前
-        -0.5f, -0.5f, 0.5f, 0.5f, 0.5f, 0.5f,  // 灰色
+        -0.5f, -0.5f, 0.5f, 0.5f, 0.5f, 0.5f, // 灰色
         // 7: 左上手前
-        -0.5f, 0.5f, 0.5f, 0.8f, 0.2f, 0.6f    // 紫
+        -0.5f, 0.5f, 0.5f, 0.8f, 0.2f, 0.6f // 紫
     };
 
     // インデックスデータ (修正)
@@ -157,11 +160,11 @@ bool Application::initialize()
     }
 
     // --- 複数の立方体の位置を初期化 ---
-    m_cubePositions.push_back(glm::vec3(0.0f, 0.0f, -3.0f));   // 中央
-    m_cubePositions.push_back(glm::vec3(2.0f, 0.0f, -3.0f));   // 右
-    m_cubePositions.push_back(glm::vec3(-2.0f, 0.0f, -3.0f));  // 左
-    m_cubePositions.push_back(glm::vec3(0.0f, 2.0f, -3.0f));   // 上
-    m_cubePositions.push_back(glm::vec3(0.0f, -2.0f, -3.0f));  // 下
+    m_cubePositions.push_back(glm::vec3(0.0f, 0.0f, -3.0f));  // 中央
+    m_cubePositions.push_back(glm::vec3(2.0f, 0.0f, -3.0f));  // 右
+    m_cubePositions.push_back(glm::vec3(-2.0f, 0.0f, -3.0f)); // 左
+    m_cubePositions.push_back(glm::vec3(0.0f, 2.0f, -3.0f));  // 上
+    m_cubePositions.push_back(glm::vec3(0.0f, -2.0f, -3.0f)); // 下
     // もっと追加しても良い
     m_cubePositions.push_back(glm::vec3(1.0f, 1.0f, -4.0f));
     m_cubePositions.push_back(glm::vec3(-1.0f, -1.0f, -2.0f));
@@ -196,7 +199,10 @@ void Application::processInput()
     {
         if (!f11_pressed_last_frame)
         {
-            toggleFullscreen();
+            int width, height;
+            glfwGetFramebufferSize(m_window.get(), &width, &height);
+            // FullscreenManagerのメソッドを呼び出す
+            m_fullscreenManager.toggleFullscreen(m_window.get(), width, height);
         }
         f11_pressed_last_frame = true;
     }
@@ -229,7 +235,7 @@ void Application::update()
 {
     float currentFrame = static_cast<float>(glfwGetTime());
     m_deltaTime = currentFrame - m_lastFrame; // 前フレームからの時間差を計算
-    m_lastFrame = currentFrame;                // 現在のフレーム時間を保存
+    m_lastFrame = currentFrame;               // 現在のフレーム時間を保存
     // 必要に応じてロジックを追加（例：カメラ移動、オブジェクトのアニメーションなど）
 
     // Application::update() の中 (m_deltaTime, m_lastFrame の計算後)
@@ -277,7 +283,7 @@ void Application::render()
 
         // (オプション) 各立方体に異なる回転を適用する例
         // 時間経過 + インデックスによるオフセットで個別の回転アニメーション
-        float angle = (float)glfwGetTime() * 25.0f * (i + 1);                       // インデックスによって回転速度を変える
+        float angle = (float)glfwGetTime() * 25.0f * (i + 1);                         // インデックスによって回転速度を変える
         model = glm::rotate(model, glm::radians(angle), glm::vec3(0.5f, 1.0f, 0.0f)); // Y軸とX軸の間で回転
 
         // モデル行列をシェーダーに送る
@@ -315,13 +321,16 @@ void Application::updateProjectionMatrix(int width, int height)
 }
 
 // マウス移動コールバック
-void Application::staticMouseCallback(GLFWwindow* window, double xposIn, double yposIn) {
-    Application* app = static_cast<Application*>(glfwGetWindowUserPointer(window));
-    if (app) {
+void Application::staticMouseCallback(GLFWwindow *window, double xposIn, double yposIn)
+{
+    Application *app = static_cast<Application *>(glfwGetWindowUserPointer(window));
+    if (app)
+    {
         float xpos = static_cast<float>(xposIn);
         float ypos = static_cast<float>(yposIn);
 
-        if (app->m_firstMouse) {
+        if (app->m_firstMouse)
+        {
             app->m_lastX = xpos;
             app->m_lastY = ypos;
             app->m_firstMouse = false;
@@ -338,58 +347,11 @@ void Application::staticMouseCallback(GLFWwindow* window, double xposIn, double 
 }
 
 // マウススクロールコールバック
-void Application::staticScrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
-    Application* app = static_cast<Application*>(glfwGetWindowUserPointer(window));
-    if (app) {
+void Application::staticScrollCallback(GLFWwindow *window, double xoffset, double yoffset)
+{
+    Application *app = static_cast<Application *>(glfwGetWindowUserPointer(window));
+    if (app)
+    {
         app->m_camera.processMouseScroll(static_cast<float>(yoffset));
     }
-}
-
-
-void Application::toggleFullscreen()
-{
-    if (m_isFullscreen)
-    {
-        // フルスクリーン -> ウィンドウモード
-        glfwSetWindowMonitor(m_window.get(), NULL, // NULL を渡すとウィンドウモードになる
-                             m_windowedX, m_windowedY,
-                             m_windowedWidth, m_windowedHeight,
-                             GLFW_DONT_CARE); // リフレッシュレートは気にしない
-
-        m_isFullscreen = false;
-    }
-    else
-    {
-        // ウィンドウモード -> フルスクリーン
-        // 現在のウィンドウの位置とサイズを保存
-        glfwGetWindowPos(m_window.get(), &m_windowedX, &m_windowedY);
-        glfwGetWindowSize(m_window.get(), &m_windowedWidth, &m_windowedHeight);
-
-        // プライマリモニターを取得
-        GLFWmonitor *primaryMonitor = glfwGetPrimaryMonitor();
-        if (!primaryMonitor)
-        {
-            std::cerr << "Failed to get primary monitor.\n";
-            return;
-        }
-
-        const GLFWvidmode *mode = glfwGetVideoMode(primaryMonitor);
-        if (!mode)
-        {
-            std::cerr << "Failed to get video mode for primary monitor.\n";
-            return;
-        }
-
-        glfwSetWindowMonitor(m_window.get(), primaryMonitor,
-                             0, 0,                          // フルスクリーンなので位置は(0,0)
-                             mode->width, mode->height,     // モニターの解像度
-                             mode->refreshRate);            // モニターのリフレッシュレート
-
-        m_isFullscreen = true;
-    }
-
-    // モード切り替え後、フレームバッファサイズが変わる可能性があるのでコールバックを呼び出す
-    int width, height;
-    glfwGetFramebufferSize(m_window.get(), &width, &height);
-    staticFramebufferSizeCallback(m_window.get(), width, height);
 }
