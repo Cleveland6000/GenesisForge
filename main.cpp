@@ -1,5 +1,5 @@
 #include <GLFW/glfw3.h>
-#include "opengl_utils.h"
+#include "opengl_utils.hpp"
 
 int main()
 {

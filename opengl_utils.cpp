@@ -1,5 +1,5 @@
 #include <glad/glad.h>
-#include "opengl_utils.h"
+#include "opengl_utils.hpp"
 #include <iostream>
 
 const unsigned int SCR_WIDTH = 800;

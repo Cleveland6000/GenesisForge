@@ -10,7 +10,7 @@
                 "-g",
                 "${workspaceFolder}\\main.cpp",
                 "${workspaceFolder}\\opengl_utils.cpp",
-                "${workspaceFolder}\\opengl_utils.h",
+                "${workspaceFolder}\\opengl_utils.hpp",
                 "${workspaceFolder}\\dependencies\\lib\\glad.c",
                 "-o",
                 "${fileDirname}\\${fileBasenameNoExtension}.exe",
