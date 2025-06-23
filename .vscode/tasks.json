@@ -9,6 +9,8 @@
                 "-fdiagnostics-color=always",
                 "-g",
                 "${workspaceFolder}\\main.cpp",
+                "${workspaceFolder}\\opengl_utils.cpp",
+                "${workspaceFolder}\\opengl_utils.h",
                 "${workspaceFolder}\\dependencies\\lib\\glad.c",
                 "-o",
                 "${fileDirname}\\${fileBasenameNoExtension}.exe",
