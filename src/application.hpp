@@ -23,6 +23,11 @@ private:
     static const float CLEAR_COLOR_B;
     static const float CLEAR_COLOR_A;
 
+    unsigned int m_VAO;
+    unsigned int m_VBO;
+    unsigned int m_EBO;
+    unsigned int m_shaderProgram;
+
     void processInput();
     void update();
     void render();
