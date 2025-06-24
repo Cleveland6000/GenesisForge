@@ -1,3 +1,0 @@
-"C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E rm -f CMakeFiles\OpenGLApp.dir/objects.a
-C:\PROGRA~2\mingw64\bin\ar.exe qc CMakeFiles\OpenGLApp.dir/objects.a @CMakeFiles\OpenGLApp.dir\objects1.rsp
-C:\PROGRA~2\mingw64\bin\G__~1.EXE -g -Wl,--whole-archive CMakeFiles\OpenGLApp.dir/objects.a -Wl,--no-whole-archive -o OpenGLApp.exe -Wl,--out-implib,libOpenGLApp.dll.a -Wl,--major-image-version,0,--minor-image-version,0 @CMakeFiles\OpenGLApp.dir\linkLibs.rsp
