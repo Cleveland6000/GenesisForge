@@ -36,7 +36,7 @@ echo ""
 # --output オプションを削除し、--filename に絶対パスを含める
 msdf-bmfont \
     --charset-file "${CHARSET_FILE}" \
-    --texture-size 512,512 \
+    --texture-size 2048,2048 \
     --field-type msdf \
     --distance-range 4 \
     --output-type json \

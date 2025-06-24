@@ -4,6 +4,8 @@
 #include "opengl_utils.hpp" // createShaderProgram関数があるヘッダー
 #include "camera.hpp"       // Cameraクラスをインクルード
 #include "timer.hpp"        // Timerクラスをインクルード
+#include "FontLoader.hpp"   // FontLoaderをインクルード
+#include "TextRenderer.hpp" // TextRendererをインクルード
 
 // 静的メンバ変数の初期化
 const float Application::CLEAR_COLOR_R = 0.0f;
@@ -16,7 +18,9 @@ Application::Application()
     : m_window(nullptr, glfwDestroyWindow),
       m_VAO(0), m_VBO(0), m_EBO(0), m_shaderProgram(0),
       m_camera(glm::vec3(0.0f, 0.0f, 3.0f)), // カメラを初期位置に設定
-      m_timer()                              // Timerクラスをデフォルトコンストラクタで初期化
+      m_timer(),                              // Timerクラスをデフォルトコンストラクタで初期化
+      m_fontLoader(),                         // FontLoaderを初期化
+      m_textRenderer()                        // TextRendererを初期化
 {
 }
 
@@ -179,7 +183,20 @@ bool Application::initialize()
     m_cubePositions.push_back(glm::vec3(-1.0f, -1.0f, -2.0f));
 
     m_fullscreenManager.toggleFullscreen(m_window.get());
-    
+
+    if (!m_fontLoader.loadSDFont("../assets/fonts/NotoSansJP-VariableFont_wght.json", "../assets/fonts/noto_sans_jp_atlas.png", m_fontData))
+    {
+        std::cerr << "Failed to load font data." << std::endl;
+        return false;
+    }
+
+    // TextRendererの初期化
+    if (!m_textRenderer.initialize("../shaders/text.vert", "../shaders/text.frag", m_fontData))
+    {
+        std::cerr << "Failed to initialize TextRenderer." << std::endl;
+        return false;
+    }
+
     return true;
 }
 
@@ -246,8 +263,8 @@ void Application::update()
         if (m_timer.getTotalTime() - lastFPSTime >= 1.0)
         {
             double fps = (double)frameCount / (m_timer.getTotalTime() - lastFPSTime);
-            std::string title = "Hello OpenGL Cubes - FPS: " + std::to_string(static_cast<int>(fps));
-            glfwSetWindowTitle(m_window.get(), title.c_str());
+            // ウィンドウタイトルではなく、TextRendererで表示するように変更
+            m_fpsString = "FPS: " + std::to_string(static_cast<int>(fps));
 
             frameCount = 0;
             lastFPSTime = m_timer.getTotalTime();
@@ -296,7 +313,7 @@ void Application::render()
 
         // (オプション) 各立方体に異なる回転を適用する例
         // 時間経過 + インデックスによるオフセットで個別の回転アニメーション
-        // float angle = m_timer.getTotalTime() * 25.0f * (i + 1);                       // インデックスによって回転速度を変える
+        // float angle = m_timer.getTotalTime() * 25.0f * (i + 1);                        // インデックスによって回転速度を変える
         // model = glm::rotate(model, glm::radians(angle), glm::vec3(0.5f, 1.0f, 0.0f)); // Y軸とX軸の間で回転
 
         // モデル行列をシェーダーに送る
@@ -307,6 +324,15 @@ void Application::render()
     }
 
     glBindVertexArray(0); // 描画終了後にVAOをアンバインド
+
+    // --- テキストレンダリング ---
+    int width, height;
+    glfwGetFramebufferSize(m_window.get(), &width, &height);
+    glm::mat4 orthoProjection = glm::ortho(0.0f, static_cast<float>(width), 0.0f, static_cast<float>(height));
+
+    // FPS表示を大きくする
+    // スケール値を 0.5f から例えば 1.0f や 1.5f に変更
+    m_textRenderer.renderText(m_fpsString, 10.0f, static_cast<float>(height) - 60.0f, 1.0f, glm::vec3(1.0f, 1.0f, 1.0f), orthoProjection); // 黄色で表示
 }
 
 // ウィンドウリサイズコールバック関連関数
@@ -316,6 +342,9 @@ void Application::staticFramebufferSizeCallback(GLFWwindow *window, int width, i
     if (app)
     {
         app->updateProjectionMatrix(width, height);
+        // テキストレンダラーにも新しいサイズを伝える
+        // TextRenderer::initialize で FontData* を受け取っているので、ここで再初期化は不要。
+        // renderText に投影行列を渡すことで対応。
     }
     glViewport(0, 0, width, height);
 }

@@ -59,7 +59,6 @@ void Camera::processMouseMovement(float xoffset, float yoffset, bool constrainPi
     updateCameraVectors();
 }
 
-
 void Camera::updateCameraVectors()
 {
     glm::vec3 front;

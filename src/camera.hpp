@@ -1,17 +1,9 @@
-#ifndef CAMERA_HPP
-#define CAMERA_HPP
+#pragma once
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-// カメラのデフォルト値
-const float YAW = -90.0f; // YAW は通常、ワールドのZ軸に沿って始まる
-const float PITCH = 0.0f;
-const float SPEED = 2.5f;
-const float SENSITIVITY = 0.1f;
-const float ZOOM = 60.0f; // デフォルトの視野角
-
-// カメラの移動方向を定義する列挙型
+// カメラ定義のための列挙型
 enum Camera_Movement {
     FORWARD,
     BACKWARD,
@@ -19,6 +11,14 @@ enum Camera_Movement {
     RIGHT
 };
 
+// デフォルト設定
+const float YAW         = -90.0f;
+const float PITCH       = 0.0f;
+const float SPEED       = 2.5f;
+const float SENSITIVITY = 0.1f;
+const float ZOOM        = 45.0f; // カメラのZoomは固定値
+
+// 抽象カメラクラス
 class Camera
 {
 public:
@@ -31,30 +31,27 @@ public:
     // オイラー角
     float Yaw;
     float Pitch;
-    // カメラの設定
+    // カメラオプション
     float MovementSpeed;
     float MouseSensitivity;
-    float Zoom; // この値は固定されます
+    float Zoom; // FOVの値として使われます
 
-    // コンストラクタ（デフォルト値付き）
-    Camera(glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f),
-           glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f),
-           float yaw = YAW,
-           float pitch = PITCH);
+    // コンストラクタ
+    Camera(glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f), float yaw = YAW, float pitch = PITCH);
 
     // ビュー行列を返す
     glm::mat4 getViewMatrix();
 
-    // キーボード入力の状態に基づいて移動するメソッド
+    // WASD入力に基づいてカメラ位置を処理
     void processMovementVector(bool forward, bool backward, bool left, bool right, float deltaTime);
 
-    // マウス入力に基づいてカメラのオイラー角とベクトルを更新する
+    // マウス入力に基づいてカメラの向きを処理
     void processMouseMovement(float xoffset, float yoffset, bool constrainPitch = true);
-
+    
+    // --- 新規追加: カメラの位置を取得するゲッター ---
+    glm::vec3 getPosition() const { return Position; }
 
 private:
-    // カメラのベクトルを再計算する (YawとPitchが変更されたときに呼ばれる)
+    // カメラベクトルを更新
     void updateCameraVectors();
 };
-
-#endif // CAMERA_HPP
