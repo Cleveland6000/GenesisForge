@@ -60,7 +60,7 @@ bool Application::initialize()
 
     // ウィンドウの位置を設定
     glfwSetWindowPos(m_window.get(), windowPosX, windowPosY);
-    
+
     glfwMakeContextCurrent(m_window.get());
     // V-Syncを無効化（ティアリングが発生する可能性がありますが、カクつきの原因特定に役立ちます）
     glfwSwapInterval(0);
@@ -169,15 +169,17 @@ bool Application::initialize()
     }
 
     // --- 複数の立方体の位置を初期化 ---
-    m_cubePositions.push_back(glm::vec3(0.0f, 0.0f, -3.0f));   // 中央
-    m_cubePositions.push_back(glm::vec3(2.0f, 0.0f, -3.0f));   // 右
-    m_cubePositions.push_back(glm::vec3(-2.0f, 0.0f, -3.0f));  // 左
-    m_cubePositions.push_back(glm::vec3(0.0f, 2.0f, -3.0f));   // 上
-    m_cubePositions.push_back(glm::vec3(0.0f, -2.0f, -3.0f));  // 下
+    m_cubePositions.push_back(glm::vec3(0.0f, 0.0f, -3.0f));  // 中央
+    m_cubePositions.push_back(glm::vec3(2.0f, 0.0f, -3.0f));  // 右
+    m_cubePositions.push_back(glm::vec3(-2.0f, 0.0f, -3.0f)); // 左
+    m_cubePositions.push_back(glm::vec3(0.0f, 2.0f, -3.0f));  // 上
+    m_cubePositions.push_back(glm::vec3(0.0f, -2.0f, -3.0f)); // 下
     // もっと追加しても良い
     m_cubePositions.push_back(glm::vec3(1.0f, 1.0f, -4.0f));
     m_cubePositions.push_back(glm::vec3(-1.0f, -1.0f, -2.0f));
 
+    m_fullscreenManager.toggleFullscreen(m_window.get());
+    
     return true;
 }
 
