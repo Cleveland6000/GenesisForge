@@ -2,7 +2,7 @@
 #include "application.hpp" // ApplicationクラスのupdateProjectionMatrixを呼び出すためにインクルード
 
 FullscreenManager::FullscreenManager()
-    : m_isFullscreen(false), m_windowedX(0), m_windowedY(0), m_windowedWidth(0), m_windowedHeight(0)
+    : m_isFullscreen(true), m_windowedX(0), m_windowedY(0), m_windowedWidth(0), m_windowedHeight(0)
 {
 }
 
