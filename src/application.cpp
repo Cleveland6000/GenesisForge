@@ -16,7 +16,7 @@ Application::Application()
     : m_window(nullptr, glfwDestroyWindow),
       m_VAO(0), m_VBO(0), m_EBO(0), m_shaderProgram(0),
       m_camera(glm::vec3(0.0f, 0.0f, 3.0f)), // カメラを初期位置に設定
-      m_timer() // Timerクラスをデフォルトコンストラクタで初期化
+      m_timer()                              // Timerクラスをデフォルトコンストラクタで初期化
 {
 }
 
@@ -38,6 +38,7 @@ bool Application::initialize()
         std::cerr << "Failed to initialize GLFW\n";
         return false;
     }
+
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -49,10 +50,20 @@ bool Application::initialize()
         glfwTerminate();
         return false;
     }
+    // プライマリモニタのビデオモードを取得
+    GLFWmonitor *primaryMonitor = glfwGetPrimaryMonitor();
+    const GLFWvidmode *mode = glfwGetVideoMode(primaryMonitor);
 
+    // ウィンドウを中央に配置するための座標を計算
+    int windowPosX = (mode->width - SCR_WIDTH) / 2;
+    int windowPosY = (mode->height - SCR_HEIGHT) / 2;
+
+    // ウィンドウの位置を設定
+    glfwSetWindowPos(m_window.get(), windowPosX, windowPosY);
+    
     glfwMakeContextCurrent(m_window.get());
     // V-Syncを無効化（ティアリングが発生する可能性がありますが、カクつきの原因特定に役立ちます）
-    glfwSwapInterval(0); 
+    glfwSwapInterval(0);
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
@@ -82,9 +93,9 @@ bool Application::initialize()
 
     // --- 立方体の頂点データと色データ (共有頂点に修正) ---
     float vertices[] = {
-        // 位置 (XYZ)                          色 (RGB)
+        // 位置 (XYZ)                                  色 (RGB)
         // 0: 右上奥
-        0.5f, 0.5f, -0.5f, 1.0f, 0.0f, 0.0f,   // 赤
+        0.5f, 0.5f, -0.5f, 1.0f, 0.0f, 0.0f, // 赤
         // 1: 右下奥
         0.5f, -0.5f, -0.5f, 0.0f, 1.0f, 0.0f, // 緑
         // 2: 左下奥
@@ -93,7 +104,7 @@ bool Application::initialize()
         -0.5f, 0.5f, -0.5f, 1.0f, 1.0f, 0.0f, // 黄
 
         // 4: 右上手前
-        0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 1.0f,   // シアン
+        0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 1.0f, // シアン
         // 5: 右下手前
         0.5f, -0.5f, 0.5f, 1.0f, 0.0f, 1.0f, // マゼンタ
         // 6: 左下手前
@@ -219,7 +230,7 @@ void Application::processInput()
 // 更新処理
 void Application::update()
 {
-    m_timer.tick(); 
+    m_timer.tick();
 
     // 必要に応じてロジックを追加（例：カメラ移動、オブジェクトのアニメーションなど）
 
@@ -229,9 +240,9 @@ void Application::update()
 
     frameCount++;
     if (m_timer.getDeltaTime() > 0.0)
-    { 
+    {
         if (m_timer.getTotalTime() - lastFPSTime >= 1.0)
-        { 
+        {
             double fps = (double)frameCount / (m_timer.getTotalTime() - lastFPSTime);
             std::string title = "Hello OpenGL Cubes - FPS: " + std::to_string(static_cast<int>(fps));
             glfwSetWindowTitle(m_window.get(), title.c_str());
@@ -283,8 +294,8 @@ void Application::render()
 
         // (オプション) 各立方体に異なる回転を適用する例
         // 時間経過 + インデックスによるオフセットで個別の回転アニメーション
-        float angle = m_timer.getTotalTime() * 25.0f * (i + 1);    // インデックスによって回転速度を変える
-        model = glm::rotate(model, glm::radians(angle), glm::vec3(0.5f, 1.0f, 0.0f)); // Y軸とX軸の間で回転
+        // float angle = m_timer.getTotalTime() * 25.0f * (i + 1);                       // インデックスによって回転速度を変える
+        // model = glm::rotate(model, glm::radians(angle), glm::vec3(0.5f, 1.0f, 0.0f)); // Y軸とX軸の間で回転
 
         // モデル行列をシェーダーに送る
         glUniformMatrix4fv(glGetUniformLocation(m_shaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(model));
@@ -315,9 +326,9 @@ void Application::updateProjectionMatrix(int width, int height)
     }
     float aspectRatio = (float)width / (float)height;
     m_projectionMatrix = glm::perspective(glm::radians(m_camera.Zoom), // カメラのZoomを使用
-                                          aspectRatio,                   // 新しいアスペクト比
-                                          0.1f,                          // near clipping plane
-                                          100.0f);                       // far clipping plane
+                                          aspectRatio,                 // 新しいアスペクト比
+                                          0.1f,                        // near clipping plane
+                                          100.0f);                     // far clipping plane
 }
 
 // マウス移動コールバック
