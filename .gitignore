@@ -42,6 +42,10 @@
 # その他の一般的に無視されるビルド関連ファイル
 # CMakeのビルドディレクトリ全体
 build/
+
 # VS Codeのワークスペース設定やログなど（任意）
 .vscode/*.code-workspace
 .vscode/*.log
+
+# VS Code settings
+.vscode/settings.json
