@@ -19,6 +19,7 @@ std::string loadShaderSource(const std::string &filePath)
     }
 
     std::stringstream ss;
+
     ss << file.rdbuf();
     return ss.str();
 }
