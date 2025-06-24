@@ -1,8 +1,9 @@
-// camera.cpp
 #include "camera.hpp"
 #include <glm/gtc/matrix_transform.hpp> // getViewMatrixで必要
+#include <glm/gtc/constants.hpp> // glm::pi<float>() のために含める
 
 Camera::Camera(glm::vec3 position, glm::vec3 up, float yaw, float pitch)
+    // Zoomは初期値のZOOMで固定され、processMouseScrollは削除されます
     : Front(glm::vec3(0.0f, 0.0f, -1.0f)), MovementSpeed(SPEED), MouseSensitivity(SENSITIVITY), Zoom(ZOOM)
 {
     Position = position;
@@ -17,17 +18,26 @@ glm::mat4 Camera::getViewMatrix()
     return glm::lookAt(Position, Position + Front, Up);
 }
 
-void Camera::processKeyboard(Camera_Movement direction, float deltaTime)
+void Camera::processMovementVector(bool forward, bool backward, bool left, bool right, float deltaTime)
 {
-    float velocity = MovementSpeed * deltaTime;
-    if (direction == FORWARD)
-        Position += Front * velocity;
-    if (direction == BACKWARD)
-        Position -= Front * velocity;
-    if (direction == LEFT)
-        Position -= Right * velocity;
-    if (direction == RIGHT)
-        Position += Right * velocity;
+    glm::vec3 movement = glm::vec3(0.0f);
+
+    if (forward)
+        movement += Front;
+    if (backward)
+        movement -= Front;
+    if (left)
+        movement -= Right;
+    if (right)
+        movement += Right;
+
+    // 移動ベクトルがゼロでない場合に正規化
+    if (glm::length(movement) > 0.0001f) // ゼロ除算を避けるための閾値
+    {
+        movement = glm::normalize(movement);
+    }
+
+    Position += movement * MovementSpeed * deltaTime;
 }
 
 void Camera::processMouseMovement(float xoffset, float yoffset, bool constrainPitch)
@@ -49,14 +59,6 @@ void Camera::processMouseMovement(float xoffset, float yoffset, bool constrainPi
     updateCameraVectors();
 }
 
-void Camera::processMouseScroll(float yoffset)
-{
-    Zoom -= yoffset;
-    if (Zoom < 1.0f)
-        Zoom = 1.0f;
-    if (Zoom > 45.0f)
-        Zoom = 45.0f;
-}
 
 void Camera::updateCameraVectors()
 {

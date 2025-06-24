@@ -1,20 +1,22 @@
 #include <glad/glad.h>
-#include "application.hpp"
+#include "application.hpp" // application.hpp をインクルード
 #include <iostream>
-#include "opengl_utils.hpp"
-#include "camera.hpp"
-#include "timer.hpp"
+#include "opengl_utils.hpp" // createShaderProgram関数があるヘッダー
+#include "camera.hpp"       // Cameraクラスをインクルード
+#include "timer.hpp"        // Timerクラスをインクルード
 
+// 静的メンバ変数の初期化
 const float Application::CLEAR_COLOR_R = 0.0f;
 const float Application::CLEAR_COLOR_G = 0.0f;
 const float Application::CLEAR_COLOR_B = 0.0f;
 const float Application::CLEAR_COLOR_A = 1.0f;
 
+// コンストラクタ
 Application::Application()
     : m_window(nullptr, glfwDestroyWindow),
       m_VAO(0), m_VBO(0), m_EBO(0), m_shaderProgram(0),
       m_camera(glm::vec3(0.0f, 0.0f, 3.0f)), // カメラを初期位置に設定
-      m_timer()                              // Timerクラスをデフォルトコンストラクタで初期化
+      m_timer() // Timerクラスをデフォルトコンストラクタで初期化
 {
 }
 
@@ -49,6 +51,8 @@ bool Application::initialize()
     }
 
     glfwMakeContextCurrent(m_window.get());
+    // V-Syncを無効化（ティアリングが発生する可能性がありますが、カクつきの原因特定に役立ちます）
+    glfwSwapInterval(0); 
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
@@ -62,8 +66,8 @@ bool Application::initialize()
     glfwSetFramebufferSizeCallback(m_window.get(), Application::staticFramebufferSizeCallback);
     // マウス入力コールバックを設定
     glfwSetCursorPosCallback(m_window.get(), Application::staticMouseCallback);
-    // スクロール入力コールバックを設定
-    glfwSetScrollCallback(m_window.get(), Application::staticScrollCallback);
+    // スクロール入力コールバックは削除されました
+    // glfwSetScrollCallback(m_window.get(), Application::staticScrollCallback); // <-- 削除
 
     // マウスカーソルを非表示にし、中心に固定
     glfwSetInputMode(m_window.get(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -80,7 +84,7 @@ bool Application::initialize()
     float vertices[] = {
         // 位置 (XYZ)                          色 (RGB)
         // 0: 右上奥
-        0.5f, 0.5f, -0.5f, 1.0f, 0.0f, 0.0f, // 赤
+        0.5f, 0.5f, -0.5f, 1.0f, 0.0f, 0.0f,   // 赤
         // 1: 右下奥
         0.5f, -0.5f, -0.5f, 0.0f, 1.0f, 0.0f, // 緑
         // 2: 左下奥
@@ -89,7 +93,7 @@ bool Application::initialize()
         -0.5f, 0.5f, -0.5f, 1.0f, 1.0f, 0.0f, // 黄
 
         // 4: 右上手前
-        0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 1.0f, // シアン
+        0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 1.0f,   // シアン
         // 5: 右下手前
         0.5f, -0.5f, 0.5f, 1.0f, 0.0f, 1.0f, // マゼンタ
         // 6: 左下手前
@@ -154,11 +158,11 @@ bool Application::initialize()
     }
 
     // --- 複数の立方体の位置を初期化 ---
-    m_cubePositions.push_back(glm::vec3(0.0f, 0.0f, -3.0f));  // 中央
-    m_cubePositions.push_back(glm::vec3(2.0f, 0.0f, -3.0f));  // 右
-    m_cubePositions.push_back(glm::vec3(-2.0f, 0.0f, -3.0f)); // 左
-    m_cubePositions.push_back(glm::vec3(0.0f, 2.0f, -3.0f));  // 上
-    m_cubePositions.push_back(glm::vec3(0.0f, -2.0f, -3.0f)); // 下
+    m_cubePositions.push_back(glm::vec3(0.0f, 0.0f, -3.0f));   // 中央
+    m_cubePositions.push_back(glm::vec3(2.0f, 0.0f, -3.0f));   // 右
+    m_cubePositions.push_back(glm::vec3(-2.0f, 0.0f, -3.0f));  // 左
+    m_cubePositions.push_back(glm::vec3(0.0f, 2.0f, -3.0f));   // 上
+    m_cubePositions.push_back(glm::vec3(0.0f, -2.0f, -3.0f));  // 下
     // もっと追加しても良い
     m_cubePositions.push_back(glm::vec3(1.0f, 1.0f, -4.0f));
     m_cubePositions.push_back(glm::vec3(-1.0f, -1.0f, -2.0f));
@@ -189,12 +193,10 @@ void Application::processInput()
     }
 
     static bool f11_pressed_last_frame = false;
-    // Application::processInput() 内
     if (glfwGetKey(m_window.get(), GLFW_KEY_F11) == GLFW_PRESS)
     {
         if (!f11_pressed_last_frame)
         {
-            // 引数から width, height を削除
             m_fullscreenManager.toggleFullscreen(m_window.get());
         }
         f11_pressed_last_frame = true;
@@ -205,31 +207,19 @@ void Application::processInput()
     }
 
     // --- WASDキーによる移動 (Cameraクラスに処理を委譲) ---
-    // m_deltaTimeの代わりにm_timer.getDeltaTime()を使用
-    if (glfwGetKey(m_window.get(), GLFW_KEY_W) == GLFW_PRESS)
-    {
-        m_camera.processKeyboard(FORWARD, m_timer.getDeltaTime());
-    }
-    if (glfwGetKey(m_window.get(), GLFW_KEY_S) == GLFW_PRESS)
-    {
-        m_camera.processKeyboard(BACKWARD, m_timer.getDeltaTime());
-    }
-    if (glfwGetKey(m_window.get(), GLFW_KEY_A) == GLFW_PRESS)
-    {
-        m_camera.processKeyboard(LEFT, m_timer.getDeltaTime());
-    }
-    if (glfwGetKey(m_window.get(), GLFW_KEY_D) == GLFW_PRESS)
-    {
-        m_camera.processKeyboard(RIGHT, m_timer.getDeltaTime());
-    }
+    bool forward = glfwGetKey(m_window.get(), GLFW_KEY_W) == GLFW_PRESS;
+    bool backward = glfwGetKey(m_window.get(), GLFW_KEY_S) == GLFW_PRESS;
+    bool left = glfwGetKey(m_window.get(), GLFW_KEY_A) == GLFW_PRESS;
+    bool right = glfwGetKey(m_window.get(), GLFW_KEY_D) == GLFW_PRESS;
+
+    // 全てのキーの状態をまとめてCameraに渡す
+    m_camera.processMovementVector(forward, backward, left, right, m_timer.getDeltaTime());
 }
 
 // 更新処理
 void Application::update()
 {
-    // deltaTimeの計算をTimerクラスに任せる
-    // Application::m_deltaTime は不要になるため、もし他の場所で使用している場合は m_timer.getDeltaTime() に置き換える
-    m_timer.tick();
+    m_timer.tick(); 
 
     // 必要に応じてロジックを追加（例：カメラ移動、オブジェクトのアニメーションなど）
 
@@ -238,11 +228,10 @@ void Application::update()
     static int frameCount = 0;
 
     frameCount++;
-    // m_deltaTimeのチェックはm_timerが内部で処理するため不要、またはm_timer.getDeltaTime() > 0.0で確認
-    if (m_timer.getDeltaTime() > 0.0) // 念のためチェック
-    {
-        if (m_timer.getTotalTime() - lastFPSTime >= 1.0) // 1秒ごとに更新
-        {
+    if (m_timer.getDeltaTime() > 0.0)
+    { 
+        if (m_timer.getTotalTime() - lastFPSTime >= 1.0)
+        { 
             double fps = (double)frameCount / (m_timer.getTotalTime() - lastFPSTime);
             std::string title = "Hello OpenGL Cubes - FPS: " + std::to_string(static_cast<int>(fps));
             glfwSetWindowTitle(m_window.get(), title.c_str());
@@ -251,8 +240,10 @@ void Application::update()
             lastFPSTime = m_timer.getTotalTime();
         }
     }
+    // デバッグ用: deltaTime と FPS をコンソールに出力
+    // std::cout << "DeltaTime: " << m_timer.getDeltaTime() << "s, Estimated FPS: " << (1.0 / m_timer.getDeltaTime()) << std::endl;
 }
-// application.cpp のどこかに resetMouseState メソッドを追加
+
 void Application::resetMouseState()
 {
     // 現在のウィンドウの中心にマウスカーソルを再配置する
@@ -292,8 +283,7 @@ void Application::render()
 
         // (オプション) 各立方体に異なる回転を適用する例
         // 時間経過 + インデックスによるオフセットで個別の回転アニメーション
-        // glfwGetTime() の代わりに m_timer.getTotalTime() を使う
-        float angle = m_timer.getTotalTime() * 25.0f * (i + 1);                       // インデックスによって回転速度を変える
+        float angle = m_timer.getTotalTime() * 25.0f * (i + 1);    // インデックスによって回転速度を変える
         model = glm::rotate(model, glm::radians(angle), glm::vec3(0.5f, 1.0f, 0.0f)); // Y軸とX軸の間で回転
 
         // モデル行列をシェーダーに送る
@@ -325,9 +315,9 @@ void Application::updateProjectionMatrix(int width, int height)
     }
     float aspectRatio = (float)width / (float)height;
     m_projectionMatrix = glm::perspective(glm::radians(m_camera.Zoom), // カメラのZoomを使用
-                                          aspectRatio,                 // 新しいアスペクト比
-                                          0.1f,                        // near clipping plane
-                                          100.0f);                     // far clipping plane
+                                          aspectRatio,                   // 新しいアスペクト比
+                                          0.1f,                          // near clipping plane
+                                          100.0f);                       // far clipping plane
 }
 
 // マウス移動コールバック
@@ -353,15 +343,5 @@ void Application::staticMouseCallback(GLFWwindow *window, double xposIn, double 
         app->m_lastY = ypos;
 
         app->m_camera.processMouseMovement(xoffset, yoffset);
-    }
-}
-
-// マウススクロールコールバック
-void Application::staticScrollCallback(GLFWwindow *window, double xoffset, double yoffset)
-{
-    Application *app = static_cast<Application *>(glfwGetWindowUserPointer(window));
-    if (app)
-    {
-        app->m_camera.processMouseScroll(static_cast<float>(yoffset));
     }
 }

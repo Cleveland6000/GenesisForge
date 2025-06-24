@@ -13,7 +13,7 @@
 
 #include "camera.hpp"
 #include "fullscreen_manager.hpp"
-#include "timer.hpp"
+#include "timer.hpp" 
 
 // ウィンドウの初期サイズ
 const unsigned int SCR_WIDTH = 800;
@@ -30,7 +30,7 @@ public:
 
     void updateProjectionMatrix(int width, int height);
 
-    // 【追加】マウス状態をリセットするパブリックメソッド
+    // マウス状態をリセットするパブリックメソッド
     void resetMouseState();
 
 private:
@@ -48,6 +48,7 @@ private:
     // カメラ
     Camera m_camera;
 
+    // 時間管理
     Timer m_timer;
 
     // 投影行列
@@ -71,7 +72,6 @@ private:
     // コールバック関数
     static void staticFramebufferSizeCallback(GLFWwindow *window, int width, int height);
     static void staticMouseCallback(GLFWwindow *window, double xposIn, double yposIn);
-    static void staticScrollCallback(GLFWwindow *window, double xoffset, double yoffset);
 };
 
 #endif // APPLICATION_HPP
