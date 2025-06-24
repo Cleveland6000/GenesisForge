@@ -13,6 +13,7 @@
 
 #include "camera.hpp"
 #include "fullscreen_manager.hpp"
+#include "timer.hpp"
 
 // ウィンドウの初期サイズ
 const unsigned int SCR_WIDTH = 800;
@@ -47,9 +48,7 @@ private:
     // カメラ
     Camera m_camera;
 
-    // 時間管理
-    float m_lastFrame = 0.0f;
-    float m_deltaTime = 0.0f;
+    Timer m_timer;
 
     // 投影行列
     glm::mat4 m_projectionMatrix;

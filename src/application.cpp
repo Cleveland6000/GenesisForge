@@ -1,22 +1,20 @@
 #include <glad/glad.h>
-#include "application.hpp" // application.hpp をインクルード
+#include "application.hpp"
 #include <iostream>
-#include "opengl_utils.hpp" // createShaderProgram関数があるヘッダー
-#include "camera.hpp"       // Cameraクラスをインクルード
-// #include "fullscreen_manager.hpp" // application.hpp でインクルード済みなので不要
+#include "opengl_utils.hpp"
+#include "camera.hpp"
+#include "timer.hpp"
 
-// 静的メンバ変数の初期化
 const float Application::CLEAR_COLOR_R = 0.0f;
 const float Application::CLEAR_COLOR_G = 0.0f;
 const float Application::CLEAR_COLOR_B = 0.0f;
 const float Application::CLEAR_COLOR_A = 1.0f;
 
-// コンストラクタ
 Application::Application()
     : m_window(nullptr, glfwDestroyWindow),
       m_VAO(0), m_VBO(0), m_EBO(0), m_shaderProgram(0),
-      m_camera(glm::vec3(0.0f, 0.0f, 3.0f)) // カメラを初期位置に設定
-                                            // m_fullscreenManagerはデフォルトコンストラクタで初期化される
+      m_camera(glm::vec3(0.0f, 0.0f, 3.0f)), // カメラを初期位置に設定
+      m_timer()                              // Timerクラスをデフォルトコンストラクタで初期化
 {
 }
 
@@ -52,10 +50,6 @@ bool Application::initialize()
 
     glfwMakeContextCurrent(m_window.get());
 
-    // FullscreenManagerに初期のウィンドウサイズを渡し、内部で保持させることもできるが、
-    // ここでは直接GLFWから取得する形を維持
-    // m_fullscreenManager.setInitialWindowParams(SCR_WIDTH, SCR_HEIGHT, 0, 0); // 必要であれば
-
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
         std::cerr << "Failed to initialize GLAD\n";
@@ -67,12 +61,12 @@ bool Application::initialize()
     // 新しい静的コールバック関数を設定
     glfwSetFramebufferSizeCallback(m_window.get(), Application::staticFramebufferSizeCallback);
     // マウス入力コールバックを設定
-    glfwSetCursorPosCallback(m_window.get(), Application::staticMouseCallback); // 追加
+    glfwSetCursorPosCallback(m_window.get(), Application::staticMouseCallback);
     // スクロール入力コールバックを設定
-    glfwSetScrollCallback(m_window.get(), Application::staticScrollCallback); // 追加
+    glfwSetScrollCallback(m_window.get(), Application::staticScrollCallback);
 
     // マウスカーソルを非表示にし、中心に固定
-    glfwSetInputMode(m_window.get(), GLFW_CURSOR, GLFW_CURSOR_DISABLED); // 追加
+    glfwSetInputMode(m_window.get(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
     // 初期ビューポートと投影行列を設定
     int initialWidth, initialHeight;
@@ -84,10 +78,10 @@ bool Application::initialize()
 
     // --- 立方体の頂点データと色データ (共有頂点に修正) ---
     float vertices[] = {
-        // 位置 (XYZ)               色 (RGB)
+        // 位置 (XYZ)                          色 (RGB)
         // 0: 右上奥
-        0.5f, 0.5f, -0.5f, 1.0f, 0.0f, 0.0f,  // 赤
-                                              // 1: 右下奥
+        0.5f, 0.5f, -0.5f, 1.0f, 0.0f, 0.0f, // 赤
+        // 1: 右下奥
         0.5f, -0.5f, -0.5f, 0.0f, 1.0f, 0.0f, // 緑
         // 2: 左下奥
         -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 1.0f, // 青
@@ -95,8 +89,8 @@ bool Application::initialize()
         -0.5f, 0.5f, -0.5f, 1.0f, 1.0f, 0.0f, // 黄
 
         // 4: 右上手前
-        0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 1.0f,  // シアン
-                                             // 5: 右下手前
+        0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 1.0f, // シアン
+        // 5: 右下手前
         0.5f, -0.5f, 0.5f, 1.0f, 0.0f, 1.0f, // マゼンタ
         // 6: 左下手前
         -0.5f, -0.5f, 0.5f, 0.5f, 0.5f, 0.5f, // 灰色
@@ -195,7 +189,7 @@ void Application::processInput()
     }
 
     static bool f11_pressed_last_frame = false;
-    // application.cpp の Application::processInput() 内
+    // Application::processInput() 内
     if (glfwGetKey(m_window.get(), GLFW_KEY_F11) == GLFW_PRESS)
     {
         if (!f11_pressed_last_frame)
@@ -211,47 +205,50 @@ void Application::processInput()
     }
 
     // --- WASDキーによる移動 (Cameraクラスに処理を委譲) ---
+    // m_deltaTimeの代わりにm_timer.getDeltaTime()を使用
     if (glfwGetKey(m_window.get(), GLFW_KEY_W) == GLFW_PRESS)
     {
-        m_camera.processKeyboard(FORWARD, m_deltaTime);
+        m_camera.processKeyboard(FORWARD, m_timer.getDeltaTime());
     }
     if (glfwGetKey(m_window.get(), GLFW_KEY_S) == GLFW_PRESS)
     {
-        m_camera.processKeyboard(BACKWARD, m_deltaTime);
+        m_camera.processKeyboard(BACKWARD, m_timer.getDeltaTime());
     }
     if (glfwGetKey(m_window.get(), GLFW_KEY_A) == GLFW_PRESS)
     {
-        m_camera.processKeyboard(LEFT, m_deltaTime);
+        m_camera.processKeyboard(LEFT, m_timer.getDeltaTime());
     }
     if (glfwGetKey(m_window.get(), GLFW_KEY_D) == GLFW_PRESS)
     {
-        m_camera.processKeyboard(RIGHT, m_deltaTime);
+        m_camera.processKeyboard(RIGHT, m_timer.getDeltaTime());
     }
 }
 
 // 更新処理
 void Application::update()
 {
-    float currentFrame = static_cast<float>(glfwGetTime());
-    m_deltaTime = currentFrame - m_lastFrame; // 前フレームからの時間差を計算
-    m_lastFrame = currentFrame;               // 現在のフレーム時間を保存
+    // deltaTimeの計算をTimerクラスに任せる
+    // Application::m_deltaTime は不要になるため、もし他の場所で使用している場合は m_timer.getDeltaTime() に置き換える
+    m_timer.tick();
+
     // 必要に応じてロジックを追加（例：カメラ移動、オブジェクトのアニメーションなど）
 
-    // Application::update() の中 (m_deltaTime, m_lastFrame の計算後)
+    // FPS表示ロジックもTimerクラスのgetTotalTime()を使用
     static double lastFPSTime = 0.0;
     static int frameCount = 0;
 
     frameCount++;
-    if (m_deltaTime > 0.0)
-    { // m_deltaTime が0でないことを確認
-        if (glfwGetTime() - lastFPSTime >= 1.0)
-        { // 1秒ごとに更新
-            double fps = (double)frameCount / (glfwGetTime() - lastFPSTime);
+    // m_deltaTimeのチェックはm_timerが内部で処理するため不要、またはm_timer.getDeltaTime() > 0.0で確認
+    if (m_timer.getDeltaTime() > 0.0) // 念のためチェック
+    {
+        if (m_timer.getTotalTime() - lastFPSTime >= 1.0) // 1秒ごとに更新
+        {
+            double fps = (double)frameCount / (m_timer.getTotalTime() - lastFPSTime);
             std::string title = "Hello OpenGL Cubes - FPS: " + std::to_string(static_cast<int>(fps));
             glfwSetWindowTitle(m_window.get(), title.c_str());
 
             frameCount = 0;
-            lastFPSTime = glfwGetTime();
+            lastFPSTime = m_timer.getTotalTime();
         }
     }
 }
@@ -295,7 +292,8 @@ void Application::render()
 
         // (オプション) 各立方体に異なる回転を適用する例
         // 時間経過 + インデックスによるオフセットで個別の回転アニメーション
-        float angle = (float)glfwGetTime() * 25.0f * (i + 1);                         // インデックスによって回転速度を変える
+        // glfwGetTime() の代わりに m_timer.getTotalTime() を使う
+        float angle = m_timer.getTotalTime() * 25.0f * (i + 1);                       // インデックスによって回転速度を変える
         model = glm::rotate(model, glm::radians(angle), glm::vec3(0.5f, 1.0f, 0.0f)); // Y軸とX軸の間で回転
 
         // モデル行列をシェーダーに送る
