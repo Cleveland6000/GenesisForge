@@ -1,32 +1,47 @@
-# Prerequisites
+# ビルド生成物 (Build Artifacts)
+
+# デバッグシンボル、依存関係情報など (Prerequisites)
+# コンパイル前の中間ファイルや依存関係情報など
 *.d
 
-# Compiled Object files
+# コンパイル済みオブジェクトファイル (Compiled Object files)
 *.slo
 *.lo
 *.o
 *.obj
 
-# Precompiled Headers
+# プリコンパイル済みヘッダー (Precompiled Headers)
+# コンパイル時間を短縮するために生成されるヘッダーファイル
 *.gch
 *.pch
 
-# Compiled Dynamic libraries
+# コンパイル済みダイナミックライブラリ (Compiled Dynamic libraries)
+# 実行時にロードされるライブラリ
 *.so
 *.dylib
 *.dll
 
-# Fortran module files
+# Fortranモジュールファイル (Fortran module files)
+# Fortranコンパイラが生成するモジュールファイル
 *.mod
 *.smod
 
-# Compiled Static libraries
+# コンパイル済みスタティックライブラリ (Compiled Static libraries)
+# 実行ファイルに静的にリンクされるライブラリ
 *.lai
 *.la
 *.a
 *.lib
 
-# Executables
+# 実行可能ファイル (Executables)
+# 最終的に生成される実行ファイル
 *.exe
 *.out
 *.app
+
+# その他の一般的に無視されるビルド関連ファイル
+# CMakeのビルドディレクトリ全体
+build/
+# VS Codeのワークスペース設定やログなど（任意）
+.vscode/*.code-workspace
+.vscode/*.log
