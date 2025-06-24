@@ -1,0 +1,3 @@
+C:/Users/rkowp/Documents/GitHub/GenesisForge/build/CMakeFiles/OpenGLApp.dir
+C:/Users/rkowp/Documents/GitHub/GenesisForge/build/CMakeFiles/edit_cache.dir
+C:/Users/rkowp/Documents/GitHub/GenesisForge/build/CMakeFiles/rebuild_cache.dir
