@@ -1,6 +1,6 @@
 #include "camera.hpp"
 #include <glm/gtc/matrix_transform.hpp> // getViewMatrixで必要
-#include <glm/gtc/constants.hpp> // glm::pi<float>() のために含める
+#include <glm/gtc/constants.hpp>        // glm::pi<float>() のために含める
 
 Camera::Camera(glm::vec3 position, glm::vec3 up, float yaw, float pitch)
     // Zoomは初期値のZOOMで固定され、processMouseScrollは削除されます
@@ -22,14 +22,18 @@ void Camera::processMovementVector(bool forward, bool backward, bool left, bool 
 {
     glm::vec3 movement = glm::vec3(0.0f);
 
+    // カメラのFrontベクトルから、Y成分を0にした水平方向の「前方」ベクトルを計算します。
+    // これにより、上下を向いていても常にXZ平面に沿って移動します。
+    glm::vec3 horizontalFront = glm::normalize(glm::vec3(Front.x, 0.0f, Front.z));
+
     if (forward)
-        movement += Front;
+        movement += horizontalFront; // 水平方向の前方ベクトルを使用
     if (backward)
-        movement -= Front;
+        movement -= horizontalFront; // 水平方向の後方ベクトルを使用
     if (left)
-        movement -= Right;
+        movement -= Right; // Rightベクトルは既に水平方向なので変更なし
     if (right)
-        movement += Right;
+        movement += Right; // Rightベクトルは既に水平方向なので変更なし
 
     // 移動ベクトルがゼロでない場合に正規化
     if (glm::length(movement) > 0.0001f) // ゼロ除算を避けるための閾値
@@ -68,4 +72,11 @@ void Camera::updateCameraVectors()
     Front = glm::normalize(front);
     Right = glm::normalize(glm::cross(Front, WorldUp));
     Up = glm::normalize(glm::cross(Right, Front));
+}
+void Camera::processVerticalMovement(bool up, bool down, float deltaTime)
+{
+    if (up)
+        Position += WorldUp * MovementSpeed * deltaTime;
+    if (down)
+        Position -= WorldUp * MovementSpeed * deltaTime;
 }

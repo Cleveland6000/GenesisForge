@@ -4,7 +4,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 // カメラ定義のための列挙型
-enum Camera_Movement {
+enum Camera_Movement
+{
     FORWARD,
     BACKWARD,
     LEFT,
@@ -12,11 +13,11 @@ enum Camera_Movement {
 };
 
 // デフォルト設定
-const float YAW         = -90.0f;
-const float PITCH       = 0.0f;
-const float SPEED       = 2.5f;
-const float SENSITIVITY = 0.1f;
-const float ZOOM        = 45.0f; // カメラのZoomは固定値
+const float YAW = -90.0f;
+const float PITCH = 0.0f;
+const float SPEED = 4.5f;
+const float SENSITIVITY = 0.05f;
+const float ZOOM = 60.0f; // カメラのZoomは固定値
 
 // 抽象カメラクラス
 class Camera
@@ -44,10 +45,11 @@ public:
 
     // WASD入力に基づいてカメラ位置を処理
     void processMovementVector(bool forward, bool backward, bool left, bool right, float deltaTime);
+    void processVerticalMovement(bool up, bool down, float deltaTime);
 
     // マウス入力に基づいてカメラの向きを処理
     void processMouseMovement(float xoffset, float yoffset, bool constrainPitch = true);
-    
+
     // --- 新規追加: カメラの位置を取得するゲッター ---
     glm::vec3 getPosition() const { return Position; }
 

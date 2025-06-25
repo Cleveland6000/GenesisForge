@@ -1,13 +1,14 @@
 #include <glad/glad.h>
 #include "application.hpp" // application.hpp をインクルード
 #include <iostream>
-#include <iomanip> // std::fixed, std::setprecision のために必要
-#include <sstream> // std::stringstream のために必要
-#include "opengl_utils.hpp" // createShaderProgram関数があるヘッダー
-#include "camera.hpp"       // Cameraクラスをインクルード
-#include "timer.hpp"        // Timerクラスをインクルード
-#include "FontLoader.hpp"   // FontLoaderをインクルード
-#include "TextRenderer.hpp" // TextRendererをインクルード
+#include <iomanip>           // std::fixed, std::setprecision のために必要
+#include <sstream>           // std::stringstream のために必要
+#include <random>            // グリッド初期化のため
+#include "opengl_utils.hpp"  // createShaderProgram関数があるヘッダー
+#include "camera.hpp"        // Cameraクラスをインクルード
+#include "timer.hpp"         // Timerクラスをインクルード
+#include "FontLoader.hpp"    // FontLoaderをインクルード
+#include "TextRenderer.hpp"  // TextRendererをインクルード
 #include "input_manager.hpp" // InputManagerをインクルード
 
 // 静的メンバ変数の初期化
@@ -21,10 +22,10 @@ Application::Application()
     : m_window(nullptr, glfwDestroyWindow),
       m_VAO(0), m_VBO(0), m_EBO(0), m_shaderProgram(0),
       m_camera(glm::vec3(0.0f, 0.0f, 3.0f)), // カメラを初期位置に設定
-      m_timer(),                          // Timerクラスをデフォルトコンストラクタで初期化
-      m_fontLoader(),                     // FontLoaderを初期化
-      m_textRenderer(),                   // TextRendererを初期化
-      m_inputManager(nullptr)             // InputManagerはinitializeで初期化
+      m_timer(),                             // Timerクラスをデフォルトコンストラクタで初期化
+      m_fontLoader(),                        // FontLoaderを初期化
+      m_textRenderer(),                      // TextRendererを初期化
+      m_inputManager(nullptr)                // InputManagerはinitializeで初期化
 {
 }
 
@@ -88,30 +89,32 @@ bool Application::initialize()
 
     // InputManagerを初期化
     m_inputManager = std::make_unique<InputManager>(m_window.get(), m_camera);
-    
+
     // FullscreenManagerにコールバックを設定
-    m_fullscreenManager.setWindowSizeChangeCallback([](int width, int height) {
-        GLFWwindow* currentWindow = glfwGetCurrentContext(); 
-        if (currentWindow) {
-            Application* app = static_cast<Application*>(glfwGetWindowUserPointer(currentWindow));
-            if (app) {
-                app->updateProjectionMatrix(width, height);
+    m_fullscreenManager.setWindowSizeChangeCallback([](int width, int int_height) { // 'height' を 'int_height' に変更して警告を回避
+        GLFWwindow *currentWindow = glfwGetCurrentContext();
+        if (currentWindow)
+        {
+            Application *app = static_cast<Application *>(glfwGetWindowUserPointer(currentWindow));
+            if (app)
+            {
+                app->updateProjectionMatrix(width, int_height);
             }
         }
     });
 
-    m_fullscreenManager.setMouseResetCallback([]() {
+    m_fullscreenManager.setMouseResetCallback([]()
+                                              {
         GLFWwindow* currentWindow = glfwGetCurrentContext();
         if (currentWindow) {
             Application* app = static_cast<Application*>(glfwGetWindowUserPointer(currentWindow));
             if (app && app->m_inputManager) { 
                 app->m_inputManager->resetMouseState();
             }
-        }
-    });
-    
-    m_fullscreenManager.toggleFullscreen(m_window.get()); 
-    
+        } });
+
+    m_fullscreenManager.toggleFullscreen(m_window.get());
+
     glEnable(GL_DEPTH_TEST);
 
     // --- 立方体の頂点データと色データ (共有頂点に修正) ---
@@ -191,24 +194,38 @@ bool Application::initialize()
         return false;
     }
 
-    // --- 複数の立方体の位置を初期化 ---
-    m_cubePositions.push_back(glm::vec3(0.0f, 0.0f, -3.0f));   // 中央
-    m_cubePositions.push_back(glm::vec3(2.0f, 0.0f, -3.0f));   // 右
-    m_cubePositions.push_back(glm::vec3(-2.0f, 0.0f, -3.0f));  // 左
-    m_cubePositions.push_back(glm::vec3(0.0f, 2.0f, -3.0f));   // 上
-    m_cubePositions.push_back(glm::vec3(0.0f, -2.0f, -3.0f));  // 下
-    // もっと追加しても良い
-    m_cubePositions.push_back(glm::vec3(1.0f, 1.0f, -4.0f));
-    m_cubePositions.push_back(glm::vec3(-1.0f, -1.0f, -2.0f));
+    // --- ボクセルグリッドの初期化とデータ設定 ---
+    m_voxelGrid.resize(m_gridSize * m_gridSize * m_gridSize);
+
+    // グリッドを中央に配置するためのオフセットを計算
+    m_gridOffset = glm::vec3(m_gridSize / 2.0f, m_gridSize / 2.0f, m_gridSize / 2.0f) * m_cubeSpacing;
+
+    // ランダムなグリッドデータを生成
+    std::random_device rd;  // シード生成
+    std::mt19937 gen(rd()); // メルセンヌ・ツイスター法による乱数エンジン
+
+    // 真になる確率を調整 (例: 0.5で50%の確率)
+    std::bernoulli_distribution dist(0.3);
+
+    for (int x = 0; x < m_gridSize; ++x)
+    {
+        for (int y = 0; y < m_gridSize; ++y)
+        {
+            for (int z = 0; z < m_gridSize; ++z)
+            {
+                size_t index = x + y * m_gridSize + z * m_gridSize * m_gridSize;
+                m_voxelGrid[index] = dist(gen); // 乱数に基づいてtrue/falseを設定
+            }
+        }
+    }
+    // m_cubePositions はもう使われません
 
     if (!m_fontLoader.loadSDFont("../assets/fonts/NotoSansJP-VariableFont_wght.json", "../assets/fonts/noto_sans_jp_atlas.png", m_fontData))
     {
         std::cerr << "Failed to load font data." << std::endl;
         return false;
     }
-std::cout << "Font Loaded. Base Font Size: " << m_fontData.baseFontSize << std::endl;
-    std::cout << "Font Line Height: " << m_fontData.lineHeight << std::endl;
-    std::cout << "Font Texture ID: " << m_fontData.textureID << std::endl;
+
     // TextRendererの初期化
     if (!m_textRenderer.initialize("../shaders/text.vert", "../shaders/text.frag", m_fontData))
     {
@@ -266,6 +283,12 @@ void Application::processInput()
     bool right = glfwGetKey(m_window.get(), GLFW_KEY_D) == GLFW_PRESS;
 
     m_camera.processMovementVector(forward, backward, left, right, m_timer.getDeltaTime());
+
+    // スペースキーと左コントロールキーによる上下移動 (Cameraクラスに処理を委譲)
+    bool moveUp = glfwGetKey(m_window.get(), GLFW_KEY_SPACE) == GLFW_PRESS;
+    bool moveDown = glfwGetKey(m_window.get(), GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS;
+
+    m_camera.processVerticalMovement(moveUp, moveDown, m_timer.getDeltaTime());
 }
 
 // 更新処理
@@ -295,8 +318,8 @@ void Application::update()
     std::stringstream ss;
     ss << std::fixed << std::setprecision(2) // 小数点以下2桁に固定
        << "Pos: X: " << cameraPos.x          // ここにスペースを追加
-       << " Y: " << cameraPos.y          // ここにスペースを追加
-       << " Z: " << cameraPos.z;         // ここにスペースを追加
+       << " Y: " << cameraPos.y              // ここにスペースを追加
+       << " Z: " << cameraPos.z;             // ここにスペースを追加
     m_positionString = ss.str();
 }
 
@@ -317,17 +340,31 @@ void Application::render()
 
     glBindVertexArray(m_VAO); // 一度バインドすればOK
 
-    // 各立方体を描画
-    for (size_t i = 0; i < m_cubePositions.size(); ++i)
+    // 各ボクセルを描画
+    for (int x = 0; x < m_gridSize; ++x)
     {
-        glm::mat4 model = glm::mat4(1.0f);
-        // 立方体の位置を適用
-        model = glm::translate(model, m_cubePositions[i]);
+        for (int y = 0; y < m_gridSize; ++y)
+        {
+            for (int z = 0; z < m_gridSize; ++z)
+            {
+                size_t index = x + y * m_gridSize + z * m_gridSize * m_gridSize;
+                if (m_voxelGrid[index])
+                { // trueの場合のみ立方体を描画
+                    glm::mat4 model = glm::mat4(1.0f);
 
-        glUniformMatrix4fv(glGetUniformLocation(m_shaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(model));
+                    // グリッド座標をワールド座標に変換し、中心を基準にオフセット
+                    glm::vec3 cubeWorldPos = glm::vec3(x * m_cubeSpacing, y * m_cubeSpacing, z * m_cubeSpacing);
+                    cubeWorldPos -= m_gridOffset; // グリッド全体を原点中心に移動
 
-        // 立方体を描画
-        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+                    model = glm::translate(model, cubeWorldPos);
+
+                    glUniformMatrix4fv(glGetUniformLocation(m_shaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(model));
+
+                    // 立方体を描画
+                    glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+                }
+            }
+        }
     }
 
     glBindVertexArray(0); // 描画終了後にVAOをアンバインド
@@ -341,27 +378,21 @@ void Application::render()
     const float TARGET_TEXT_HEIGHT_PX = 30.0f; // 例: 30ピクセル
 
     // フォントデータから読み込んだ基準フォントサイズに基づいてスケールを計算
-    // m_fontData.baseFontSize が0の場合は、念のためデフォルト値を使用
-    float textScale = 1.0f; 
-    if (m_fontData.baseFontSize > 0) {
+    float textScale = 1.0f;
+    if (m_fontData.baseFontSize > 0)
+    {
         textScale = TARGET_TEXT_HEIGHT_PX / static_cast<float>(m_fontData.baseFontSize);
     }
-    // または m_fontData.lineHeight を使用することも可能 (より正確な行の高さ)
-    // if (m_fontData.lineHeight > 0) {
-    //     textScale = TARGET_TEXT_HEIGHT_PX / static_cast<float>(m_fontData.lineHeight);
-    // }
 
+    m_textRenderer.renderText(m_fpsString, 10.0f, static_cast<float>(height) - 60.0f, textScale, glm::vec3(1.0f, 1.0f, 1.0f), orthoProjection);
 
-    m_textRenderer.renderText(m_fpsString, 10.0f, static_cast<float>(height) - 60.0f, textScale, glm::vec3(1.0f, 1.0f, 1.0f), orthoProjection); 
-    
     // 座標表示 (FPSの下に配置)
-    // Y座標は、FPS表示のY座標から、目標とする文字の高さと少しの余白を引いて調整
-    m_textRenderer.renderText(m_positionString, 
-                             10.0f, 
-                             (static_cast<float>(height) - 60.0f) - (TARGET_TEXT_HEIGHT_PX + 10.0f), // FPSのY位置 - (文字高さ + 余白)
-                             textScale, 
-                             glm::vec3(1.0f, 1.0f, 1.0f), 
-                             orthoProjection);
+    m_textRenderer.renderText(m_positionString,
+                              10.0f,
+                              (static_cast<float>(height) - 60.0f) - (TARGET_TEXT_HEIGHT_PX + 10.0f),
+                              textScale,
+                              glm::vec3(1.0f, 1.0f, 1.0f),
+                              orthoProjection);
 }
 
 // ウィンドウリサイズコールバック関連関数
@@ -383,9 +414,9 @@ void Application::updateProjectionMatrix(int width, int height)
     }
     float aspectRatio = (float)width / (float)height;
     m_projectionMatrix = glm::perspective(glm::radians(m_camera.Zoom), // カメラのZoomを使用
-                                          aspectRatio,                   // 新しいアスペクト比
-                                          0.1f,                          // near clipping plane
-                                          100.0f);                       // far clipping plane
+                                          aspectRatio,                 // 新しいアスペクト比
+                                          0.1f,                        // near clipping plane
+                                          100.0f);                     // far clipping plane
 }
 
 // マウス移動コールバック

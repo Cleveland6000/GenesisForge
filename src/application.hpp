@@ -49,8 +49,14 @@ private:
     // 入力マネージャー
     std::unique_ptr<InputManager> m_inputManager;
 
-    // キューブの位置
-    std::vector<glm::vec3> m_cubePositions;
+    // キューブの位置 (グリッドベースの生成に置き換えられるため、このメンバーは使わなくなりますが、互換性のため残します)
+    // std::vector<glm::vec3> m_cubePositions; // 将来的には削除可能
+
+    // === 新しいボクセルグリッドのメンバー変数 ===
+    std::vector<bool> m_voxelGrid; // 1次元で管理するbool配列 (16*16*16)
+    int m_gridSize = 16;           // グリッドの各次元のサイズ
+    float m_cubeSpacing = 1.0f;    // 立方体間の間隔 (立方体のサイズと一致させる)
+    glm::vec3 m_gridOffset;        // グリッド全体を中央に配置するためのオフセット
 
     // 投影行列
     glm::mat4 m_projectionMatrix;
@@ -60,7 +66,7 @@ private:
     FontData m_fontData; // ロードされたフォントデータ
     TextRenderer m_textRenderer;
     std::string m_fpsString = "FPS: 0";       // 表示するFPS文字列
-    std::string m_positionString = "Pos: X:0.0 Y:0.0 Z:0.0"; // 表示する座標文字列
+    std::string m_positionString = "Pos: X: 0.0 Y: 0.0 Z: 0.0"; // 表示する座標文字列
 
     // 定数
     static const float CLEAR_COLOR_R;
