@@ -15,6 +15,7 @@
 #include "fullscreen_manager.hpp"
 #include "FontLoader.hpp"   // FontLoaderの宣言のために必要
 #include "TextRenderer.hpp" // TextRendererの宣言のために必要
+#include "input_manager.hpp" // InputManagerの宣言のために必要
 
 class Application
 {
@@ -27,8 +28,6 @@ public:
 
     // ウィンドウリサイズ時にProjection Matrixを更新するためのパブリックメソッド
     void updateProjectionMatrix(int width, int height);
-    // マウス状態をリセットする関数
-    void resetMouseState();
 
 private:
     // GLFWwindowを管理するためのunique_ptr
@@ -47,13 +46,11 @@ private:
     // フルスクリーンマネージャー
     FullscreenManager m_fullscreenManager;
 
+    // 入力マネージャー
+    std::unique_ptr<InputManager> m_inputManager;
+
     // キューブの位置
     std::vector<glm::vec3> m_cubePositions;
-
-    // マウス入力関連
-    float m_lastX = 400.0f; // ウィンドウの中心を初期値とする (仮)
-    float m_lastY = 300.0f; // ウィンドウの中心を初期値とする (仮)
-    bool m_firstMouse = true;
 
     // 投影行列
     glm::mat4 m_projectionMatrix;
@@ -62,7 +59,8 @@ private:
     FontLoader m_fontLoader;
     FontData m_fontData; // ロードされたフォントデータ
     TextRenderer m_textRenderer;
-    std::string m_fpsString = "FPS: 0"; // 表示するFPS文字列
+    std::string m_fpsString = "FPS: 0";       // 表示するFPS文字列
+    std::string m_positionString = "Pos: X:0.0 Y:0.0 Z:0.0"; // 表示する座標文字列
 
     // 定数
     static const float CLEAR_COLOR_R;
@@ -80,7 +78,6 @@ private:
     // 静的コールバック関数 (CスタイルコールバックとしてApplicationインスタンスにディスパッチするため)
     static void staticFramebufferSizeCallback(GLFWwindow *window, int width, int height);
     static void staticMouseCallback(GLFWwindow *window, double xposIn, double yposIn);
-    // static void staticScrollCallback(GLFWwindow *window, double xoffset, double yoffset); // 削除
 };
 
 #endif // APPLICATION_HPP

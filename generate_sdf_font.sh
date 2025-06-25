@@ -41,6 +41,7 @@ msdf-bmfont \
     --distance-range 4 \
     --output-type json \
     --filename "${OUTPUT_DIR}${ATLAS_FILENAME}" \
+    --font-size 64 \
     "${FONT_FILE}"
 
 if [ $? -ne 0 ]; then

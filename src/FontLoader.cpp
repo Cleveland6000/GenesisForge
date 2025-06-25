@@ -7,83 +7,13 @@
 #include <json.hpp> // 例: プロジェクトルートのdependenciesフォルダにある場合
 
 // stb_imageをインクルード (画像ローダー、もしあれば)
+// STB_IMAGE_IMPLEMENTATION はこのファイルで一度だけ定義し、stb_image.h の前に置きます。
+// 通常はstb_image.hであり、stb_image.hppではないことに注意してください。
 #define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.hpp> // 例: プロジェクトルートのdependenciesフォルダにある場合
+#include <stb_image.hpp> // Corrected: assumed to be stb_image.h
 
-// コンストラクタ
-FontLoader::FontLoader() {
-    // コンストラクタでの特別な初期化は不要
-}
-
-// デストラクタ
-FontLoader::~FontLoader() {
-    // デストラクタでのリソース解放は、FontData構造体を管理する側で行う
-}
-
-// SDFフォントアトラスとJSONメタデータをロードする関数
-bool FontLoader::loadSDFont(const std::string& fontJsonPath, const std::string& fontPngPath, FontData& fontData) {
-    fontData.isLoaded = false;
-
-    // --- 1. JSONメタデータのロードとパース ---
-    std::ifstream jsonFile(fontJsonPath);
-    if (!jsonFile.is_open()) {
-        std::cerr << "Error: Could not open font JSON file: " << fontJsonPath << std::endl;
-        return false;
-    }
-
-    nlohmann::json jsonDoc;
-    try {
-        jsonFile >> jsonDoc;
-    } catch (const nlohmann::json::parse_error& e) {
-        std::cerr << "Error: Could not parse font JSON file '" << fontJsonPath << "': " << e.what() << std::endl;
-        return false;
-    }
-
-    // commonセクションからフォント情報を取得
-    if (jsonDoc.count("common") && jsonDoc["common"].is_object()) {
-        fontData.lineHeight = jsonDoc["common"].value("lineHeight", 0);
-        fontData.textureWidth = jsonDoc["common"].value("scaleW", 0);
-        fontData.textureHeight = jsonDoc["common"].value("scaleH", 0);
-    } else {
-        std::cerr << "Error: 'common' section not found or invalid in JSON: " << fontJsonPath << std::endl;
-        return false;
-    }
-
-    // charsセクションから各文字の情報を取得
-    if (jsonDoc.count("chars") && jsonDoc["chars"].is_array()) {
-        for (const auto& charEntry : jsonDoc["chars"]) {
-            CharInfo charInfo;
-            charInfo.id = charEntry.value("id", 0);
-            charInfo.x = charEntry.value("x", 0);
-            charInfo.y = charEntry.value("y", 0);
-            charInfo.width = charEntry.value("width", 0);
-            charInfo.height = charEntry.value("height", 0);
-            charInfo.xoffset = charEntry.value("xoffset", 0);
-            charInfo.yoffset = charEntry.value("yoffset", 0);
-            charInfo.xadvance = charEntry.value("xadvance", 0);
-            fontData.chars[charInfo.id] = charInfo;
-        }
-    } else {
-        std::cerr << "Error: 'chars' section not found or invalid in JSON: " << fontJsonPath << std::endl;
-        return false;
-    }
-    
-    // カーニング情報をロード（オプション）
-    // BMFont JSONはkerningセクションを持つことがありますが、
-    // msdf-bmfont-xmlはkersセクションを持たないことがあります。
-    // 必要であればここに追加します。
-
-    // --- 2. PNGアトラス画像のロードとOpenGLテクスチャの作成 ---
-    fontData.textureID = loadTexture(fontPngPath, fontData.textureWidth, fontData.textureHeight);
-    if (fontData.textureID == 0) {
-        std::cerr << "Error: Failed to load font texture from PNG: " << fontPngPath << std::endl;
-        return false;
-    }
-
-    fontData.isLoaded = true;
-    std::cout << "SDF font '" << fontJsonPath << "' loaded successfully." << std::endl;
-    return true;
-}
+FontLoader::FontLoader() {}
+FontLoader::~FontLoader() {}
 
 // PNG画像をロードしてOpenGLテクスチャを作成するヘルパー関数
 GLuint FontLoader::loadTexture(const std::string& imagePath, int& width, int& height) {
@@ -94,35 +24,77 @@ GLuint FontLoader::loadTexture(const std::string& imagePath, int& width, int& he
     // テクスチャパラメータを設定
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); // ミップマップを使用
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); // SDFはミップマップが重要
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     int nrChannels;
-    // stbi_set_flip_vertically_on_load(true); // OpenGLはY軸が下向きなので画像を反転する必要がある場合がある
-                                           // MSDFの場合、Y座標は通常上から下に増えるので反転しないことが多い
-    unsigned char* data = stbi_load(imagePath.c_str(), &width, &height, &nrChannels, 0);
-
+    unsigned char *data = stbi_load(imagePath.c_str(), &width, &height, &nrChannels, 0);
     if (data) {
-        GLenum format;
-        if (nrChannels == 1) format = GL_RED;
-        else if (nrChannels == 3) format = GL_RGB;
-        else if (nrChannels == 4) format = GL_RGBA;
-        else {
-            std::cerr << "Error: Unsupported number of channels for texture: " << nrChannels << std::endl;
-            stbi_image_free(data);
-            return 0;
-        }
+        GLenum format = GL_RGBA; // MSDFアトラスは通常RGBA (R, G, B, A または アルファのみ)
+        if (nrChannels == 3) format = GL_RGB;
+        else if (nrChannels == 1) format = GL_RED; // たとえREDでも、SDFシェーダーはRGBAを期待する場合があります
 
         glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D); // ミップマップ生成
-
-        stbi_image_free(data);
-        std::cout << "Texture '" << imagePath << "' loaded. Width: " << width << ", Height: " << height << ", Channels: " << nrChannels << std::endl;
+        glGenerateMipmap(GL_TEXTURE_2D);
     } else {
-        std::cerr << "Error: Failed to load image: " << imagePath << " - " << stbi_failure_reason() << std::endl;
-        glDeleteTextures(1, &textureID);
+        std::cerr << "Failed to load texture: " << imagePath << std::endl;
+        stbi_image_free(data);
         return 0;
     }
-
+    stbi_image_free(data);
     return textureID;
+}
+
+
+bool FontLoader::loadSDFont(const std::string& fontJsonPath, const std::string& fontPngPath, FontData& fontData) {
+    std::ifstream ifs(fontJsonPath);
+    if (!ifs.is_open()) {
+        std::cerr << "Failed to open font JSON file: " << fontJsonPath << std::endl;
+        return false;
+    }
+
+    std::stringstream buffer;
+    buffer << ifs.rdbuf();
+    std::string jsonStr = buffer.str();
+
+    try {
+        // nlohmann::json を使ってJSON文字列をパース
+        nlohmann::json j = nlohmann::json::parse(jsonStr);
+
+        // JSONデータからFontData構造体に値を割り当てる
+        fontData.lineHeight = j["common"]["lineHeight"].get<int>();
+        fontData.textureWidth = j["common"]["scaleW"].get<int>();
+        fontData.textureHeight = j["common"]["scaleH"].get<int>();
+        fontData.baseFontSize = j["info"]["size"].get<int>(); // ★ここを有効化します★
+
+        // 各文字の情報をパース
+        for (const auto& char_json : j["chars"]) {
+            CharInfo charInfo;
+            charInfo.id = char_json["id"].get<int>();
+            charInfo.x = char_json["x"].get<int>();
+            charInfo.y = char_json["y"].get<int>();
+            charInfo.width = char_json["width"].get<int>();
+            charInfo.height = char_json["height"].get<int>();
+            charInfo.xoffset = char_json["xoffset"].get<int>();
+            charInfo.yoffset = char_json["yoffset"].get<int>();
+            charInfo.xadvance = char_json["xadvance"].get<int>();
+            fontData.chars[charInfo.id] = charInfo;
+        }
+
+    } catch (const nlohmann::json::exception& e) { // nlohmann::json の例外を捕捉
+        std::cerr << "Failed to parse font JSON (nlohmann::json error): " << e.what() << std::endl;
+        return false;
+    } catch (const std::exception& e) { // その他の標準例外を捕捉
+        std::cerr << "Failed to parse font JSON or data missing (std::exception): " << e.what() << std::endl;
+        return false;
+    }
+
+    fontData.textureID = loadTexture(fontPngPath, fontData.textureWidth, fontData.textureHeight);
+    if (fontData.textureID == 0) {
+        std::cerr << "Failed to load font texture." << std::endl;
+        return false;
+    }
+
+    fontData.isLoaded = true;
+    return true;
 }

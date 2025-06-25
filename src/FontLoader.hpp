@@ -18,7 +18,8 @@ struct CharInfo {
 
 // フォント全体に関する情報を保持する構造体
 struct FontData {
-    int lineHeight;   // 行の高さ
+    int lineHeight;   // 行の高さ (JSONのcommon.lineHeight)
+    int baseFontSize; // フォント生成時の基準フォントサイズ (JSONのinfo.size)
     int textureWidth; // フォントアトラスの幅
     int textureHeight; // フォントアトラスの高さ
     GLuint textureID; // OpenGLテクスチャID

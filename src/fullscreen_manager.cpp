@@ -1,8 +1,12 @@
 #include "fullscreen_manager.hpp"
-#include "application.hpp" // ApplicationクラスのupdateProjectionMatrixを呼び出すためにインクルード
+// Applicationクラスを直接インクルードする必要がなくなる
 
 FullscreenManager::FullscreenManager()
-    : m_isFullscreen(true), m_windowedX(0), m_windowedY(0), m_windowedWidth(0), m_windowedHeight(0)
+    : m_isFullscreen(true),
+      m_windowedX(0), m_windowedY(0),
+      m_windowedWidth(0), m_windowedHeight(0),
+      m_windowSizeChangeCallback(nullptr), // コールバックをnullptrで初期化
+      m_mouseResetCallback(nullptr)       // コールバックをnullptrで初期化
 {
 }
 
@@ -49,11 +53,15 @@ void FullscreenManager::toggleFullscreen(GLFWwindow *window)
     int actualWidth, actualHeight;
     glfwGetFramebufferSize(window, &actualWidth, &actualHeight);
 
-    Application *app = static_cast<Application *>(glfwGetWindowUserPointer(window));
-    if (app)
+    // Applicationクラスへの直接依存を排除し、登録されたコールバックを呼び出す
+    if (m_windowSizeChangeCallback)
     {
-        app->updateProjectionMatrix(actualWidth, actualHeight);
-        app->resetMouseState(); // 【追加】フルスクリーン切り替え後にマウス状態をリセット
+        m_windowSizeChangeCallback(actualWidth, actualHeight);
     }
+    if (m_mouseResetCallback)
+    {
+        m_mouseResetCallback();
+    }
+
     glViewport(0, 0, actualWidth, actualHeight);
 }
