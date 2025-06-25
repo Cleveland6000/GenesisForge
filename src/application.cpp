@@ -6,21 +6,65 @@
 
 const float Application::CLEAR_COLOR_R = 0.0f, Application::CLEAR_COLOR_G = 0.0f, Application::CLEAR_COLOR_B = 0.0f, Application::CLEAR_COLOR_A = 1.0f;
 
-Application::Application()
+// コンストラクタ引数からFontLoaderを削除し、FontDataは参照で受け取る
+Application::Application(std::unique_ptr<Camera> camera,
+                         std::unique_ptr<Timer> timer,
+                         std::unique_ptr<InputManager> inputManager,
+                         std::unique_ptr<FullscreenManager> fullscreenManager,
+                         std::unique_ptr<Chunk> chunk,
+                         std::unique_ptr<Renderer> renderer,
+                         std::unique_ptr<FontData> fontData,
+                         std::unique_ptr<FontLoader> fontLoader) // FontLoaderを追加
     : m_window(nullptr, glfwDestroyWindow),
-      m_camera(glm::vec3(0.0f)),
-      m_timer(), m_fontLoader(), m_inputManager(nullptr),
-      m_chunk(nullptr), m_renderer(nullptr) {}
+      m_camera(std::move(camera)),
+      m_timer(std::move(timer)),
+      m_inputManager(std::move(inputManager)),
+      m_fullscreenManager(std::move(fullscreenManager)),
+      m_fontData(std::move(fontData)), // FontDataの所有権を移動
+      m_chunk(std::move(chunk)),
+      m_renderer(std::move(renderer)),
+      m_fontLoader(std::move(fontLoader)) // FontLoaderの所有権を移動
+{
+    std::cout << "--- Application constructor called. ---\n";
+}
 
 Application::~Application() { glfwTerminate(); }
 
-bool Application::initialize() {
-    return initGLFW() && createWindowAndContext() && (setupCallbacks(), true)
-        && initializeManagers() && initializeChunkAndFont() && initializeRenderer();
+bool Application::initialize()
+{
+    if (!initGLFW())
+    { /* error */
+    }
+    if (!createWindowAndContext())
+    { /* error */
+    } // ここでOpenGLコンテキストが作成される
+    setupCallbacks();
+
+    // ★★★ ここでFontDataをロードする！ ★★★
+    if (!m_fontLoader->loadSDFont("../assets/fonts/NotoSansJP-VariableFont_wght.json", "../assets/fonts/noto_sans_jp_atlas.png", *m_fontData))
+    {
+        std::cerr << "Application: Failed to load font data." << std::endl;
+        return false;
+    }
+    std::cout << "FontData loaded by Application.\n";
+
+    if (!initializeManagersAndLoadResources())
+    { /* error */
+    }
+
+    if (m_renderer && !m_renderer->initialize(*m_fontData))
+    {
+        std::cerr << "Failed to initialize Renderer.\n";
+        return false;
+    }
+    std::cout << "Application initialized successfully.\n";
+    return true;
 }
 
-bool Application::initGLFW() {
-    if (!glfwInit()) {
+bool Application::initGLFW()
+{
+    if (!glfwInit())
+    {
         std::cerr << "Failed to initialize GLFW\n";
         return false;
     }
@@ -30,9 +74,11 @@ bool Application::initGLFW() {
     return true;
 }
 
-bool Application::createWindowAndContext() {
+bool Application::createWindowAndContext()
+{
     m_window.reset(glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Hello OpenGL Cubes", NULL, NULL));
-    if (!m_window) {
+    if (!m_window)
+    {
         std::cerr << "Failed to create GLFW window\n";
         glfwTerminate();
         return false;
@@ -42,62 +88,54 @@ bool Application::createWindowAndContext() {
     glfwSetWindowPos(m_window.get(), (mode->width - SCR_WIDTH) / 2, (mode->height - SCR_HEIGHT) / 2);
     glfwMakeContextCurrent(m_window.get());
     glfwSwapInterval(0);
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
         std::cerr << "Failed to initialize GLAD\n";
         return false;
     }
     return true;
 }
 
-void Application::setupCallbacks() {
+void Application::setupCallbacks()
+{
     auto win = m_window.get();
     glfwSetWindowUserPointer(win, this);
     glfwSetFramebufferSizeCallback(win, Application::staticFramebufferSizeCallback);
     glfwSetCursorPosCallback(win, Application::staticMouseCallback);
 }
 
-bool Application::initializeManagers() {
-    m_inputManager = std::make_unique<InputManager>(m_window.get(), m_camera);
-    m_fullscreenManager.setWindowSizeChangeCallback([](int w, int h) {
-        if (auto win = glfwGetCurrentContext()) {
-            if (auto app = static_cast<Application *>(glfwGetWindowUserPointer(win)))
-                app->updateProjectionMatrix(w, h);
-        }
-    });
-    m_fullscreenManager.setMouseResetCallback([]() {
-        if (auto win = glfwGetCurrentContext()) {
-            if (auto app = static_cast<Application *>(glfwGetWindowUserPointer(win)); app && app->m_inputManager)
-                app->m_inputManager->resetMouseState();
-        }
-    });
-    m_fullscreenManager.toggleFullscreen(m_window.get());
+// FontLoader関連の処理を削除
+bool Application::initializeManagersAndLoadResources()
+{
+    // nullチェックを追加 (DIで渡されなかった場合を考慮)
+    if (!m_inputManager || !m_fullscreenManager || !m_chunk)
+    {
+        std::cerr << "One or more managers/resources not provided via DI.\n";
+        return false;
+    }
+
+    // InputManager にウィンドウポインタを設定
+    m_inputManager->setWindow(m_window.get());
+
+    m_fullscreenManager->setWindowSizeChangeCallback([this](int w, int h)
+                                                     { this->updateProjectionMatrix(w, h); });
+    m_fullscreenManager->setMouseResetCallback([this]()
+                                               {
+        if (this->m_inputManager) {
+            this->m_inputManager->resetMouseState();
+        } });
+    m_fullscreenManager->toggleFullscreen(m_window.get());
+
+    // FontDataのロードはGameApplicationで行われるため、ここからは削除
+    // ApplicationはFontDataの参照を持つのみ
+
     return true;
 }
 
-bool Application::initializeChunkAndFont() {
-    try { m_chunk = std::make_unique<Chunk>(m_gridSize, 0.3f); }
-    catch (const std::exception &e) {
-        std::cerr << "Failed to create Chunk: " << e.what() << std::endl;
-        return false;
-    }
-    if (!m_fontLoader.loadSDFont("../assets/fonts/NotoSansJP-VariableFont_wght.json", "../assets/fonts/noto_sans_jp_atlas.png", m_fontData)) {
-        std::cerr << "Failed to load font data." << std::endl;
-        return false;
-    }
-    return true;
-}
-
-bool Application::initializeRenderer() {
-    m_renderer = std::make_unique<Renderer>();
-    if (!m_renderer->initialize(m_fontData)) {
-        std::cerr << "Failed to initialize Renderer.\n";
-        return false;
-    }
-    return true;
-}
-
-void Application::run() {
-    while (!glfwWindowShouldClose(m_window.get())) {
+void Application::run()
+{
+    while (!glfwWindowShouldClose(m_window.get()))
+    {
         processInput();
         update();
         render();
@@ -106,48 +144,60 @@ void Application::run() {
     }
 }
 
-void Application::processInput() {
+void Application::processInput()
+{
     static bool f11_last = false;
-    if (glfwGetKey(m_window.get(), GLFW_KEY_F11) == GLFW_PRESS) {
-        if (!f11_last) m_fullscreenManager.toggleFullscreen(m_window.get());
+    if (glfwGetKey(m_window.get(), GLFW_KEY_F11) == GLFW_PRESS)
+    {
+        if (!f11_last)
+            m_fullscreenManager->toggleFullscreen(m_window.get());
         f11_last = true;
-    } else f11_last = false;
+    }
+    else
+        f11_last = false;
 
-    if (m_inputManager) m_inputManager->processInput();
+    if (m_inputManager)
+        m_inputManager->processInput();
 
-    auto key = [this](int k) { return glfwGetKey(m_window.get(), k) == GLFW_PRESS; };
-    m_camera.processMovementVector(key(GLFW_KEY_W), key(GLFW_KEY_S), key(GLFW_KEY_A), key(GLFW_KEY_D), m_timer.getDeltaTime());
-    m_camera.processVerticalMovement(key(GLFW_KEY_SPACE), key(GLFW_KEY_LEFT_CONTROL), m_timer.getDeltaTime());
+    auto key = [this](int k)
+    { return glfwGetKey(m_window.get(), k) == GLFW_PRESS; };
+    m_camera->processMovementVector(key(GLFW_KEY_W), key(GLFW_KEY_S), key(GLFW_KEY_A), key(GLFW_KEY_D), m_timer->getDeltaTime());
+    m_camera->processVerticalMovement(key(GLFW_KEY_SPACE), key(GLFW_KEY_LEFT_CONTROL), m_timer->getDeltaTime());
 }
 
-void Application::update() {
-    m_timer.tick();
+void Application::update()
+{
+    m_timer->tick();
     updateFpsAndPositionStrings();
 }
 
-void Application::updateFpsAndPositionStrings() {
+void Application::updateFpsAndPositionStrings()
+{
     static double lastFPSTime = 0.0;
     static int frameCount = 0;
     frameCount++;
-    if (m_timer.getDeltaTime() > 0.0 && m_timer.getTotalTime() - lastFPSTime >= 1.0) {
-        double fps = frameCount / (m_timer.getTotalTime() - lastFPSTime);
+    if (m_timer->getDeltaTime() > 0.0 && m_timer->getTotalTime() - lastFPSTime >= 1.0)
+    {
+        double fps = frameCount / (m_timer->getTotalTime() - lastFPSTime);
         m_fpsString = "FPS: " + std::to_string(static_cast<int>(fps));
         frameCount = 0;
-        lastFPSTime = m_timer.getTotalTime();
+        lastFPSTime = m_timer->getTotalTime();
     }
-    glm::vec3 pos = m_camera.getPosition();
+    glm::vec3 pos = m_camera->getPosition();
     std::stringstream ss;
     ss << std::fixed << std::setprecision(2) << "Pos: X: " << pos.x << " Y: " << pos.y << " Z: " << pos.z;
     m_positionString = ss.str();
 }
 
-void Application::render() {
-    if (!m_renderer) {
+void Application::render()
+{
+    if (!m_renderer)
+    {
         std::cerr << "Renderer is not initialized!\n";
         return;
     }
     m_renderer->beginFrame(glm::vec4(CLEAR_COLOR_R, CLEAR_COLOR_G, CLEAR_COLOR_B, CLEAR_COLOR_A));
-    glm::mat4 view = m_camera.getViewMatrix();
+    glm::mat4 view = m_camera->getViewMatrix();
     m_renderer->renderScene(m_projectionMatrix, view, *m_chunk, m_cubeSpacing);
     int w, h;
     glfwGetFramebufferSize(m_window.get(), &w, &h);
@@ -155,19 +205,23 @@ void Application::render() {
     m_renderer->endFrame();
 }
 
-void Application::staticFramebufferSizeCallback(GLFWwindow *window, int width, int height) {
+void Application::staticFramebufferSizeCallback(GLFWwindow *window, int width, int height)
+{
     if (auto app = static_cast<Application *>(glfwGetWindowUserPointer(window)))
         app->updateProjectionMatrix(width, height);
     glViewport(0, 0, width, height);
 }
 
-void Application::updateProjectionMatrix(int width, int height) {
-    if (width == 0 || height == 0) return;
+void Application::updateProjectionMatrix(int width, int height)
+{
+    if (width == 0 || height == 0)
+        return;
     float aspect = (float)width / (float)height;
-    m_projectionMatrix = glm::perspective(glm::radians(m_camera.Zoom), aspect, 0.1f, 100.0f);
+    m_projectionMatrix = glm::perspective(glm::radians(m_camera->Zoom), aspect, 0.1f, 100.0f);
 }
 
-void Application::staticMouseCallback(GLFWwindow *window, double xpos, double ypos) {
+void Application::staticMouseCallback(GLFWwindow *window, double xpos, double ypos)
+{
     if (auto app = static_cast<Application *>(glfwGetWindowUserPointer(window)); app && app->m_inputManager)
         app->m_inputManager->processMouseMovement(xpos, ypos);
 }
