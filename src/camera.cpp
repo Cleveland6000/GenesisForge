@@ -1,15 +1,11 @@
 #include "camera.hpp"
-#include <glm/gtc/matrix_transform.hpp> // getViewMatrixで必要
-#include <glm/gtc/constants.hpp>        // glm::pi<float>() のために含める
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/constants.hpp>
 
 Camera::Camera(glm::vec3 position, glm::vec3 up, float yaw, float pitch)
-    // Zoomは初期値のZOOMで固定され、processMouseScrollは削除されます
-    : Front(glm::vec3(0.0f, 0.0f, -1.0f)), MovementSpeed(SPEED), MouseSensitivity(SENSITIVITY), Zoom(ZOOM)
+    : Front(0.0f, 0.0f, -1.0f), MovementSpeed(SPEED), MouseSensitivity(SENSITIVITY), Zoom(ZOOM),
+      Position(position), WorldUp(up), Yaw(yaw), Pitch(pitch)
 {
-    Position = position;
-    WorldUp = up;
-    Yaw = yaw;
-    Pitch = pitch;
     updateCameraVectors();
 }
 
@@ -20,27 +16,18 @@ glm::mat4 Camera::getViewMatrix()
 
 void Camera::processMovementVector(bool forward, bool backward, bool left, bool right, float deltaTime)
 {
-    glm::vec3 movement = glm::vec3(0.0f);
-
-    // カメラのFrontベクトルから、Y成分を0にした水平方向の「前方」ベクトルを計算します。
-    // これにより、上下を向いていても常にXZ平面に沿って移動します。
+    glm::vec3 movement(0.0f);
     glm::vec3 horizontalFront = glm::normalize(glm::vec3(Front.x, 0.0f, Front.z));
-
     if (forward)
-        movement += horizontalFront; // 水平方向の前方ベクトルを使用
+        movement += horizontalFront;
     if (backward)
-        movement -= horizontalFront; // 水平方向の後方ベクトルを使用
+        movement -= horizontalFront;
     if (left)
-        movement -= Right; // Rightベクトルは既に水平方向なので変更なし
+        movement -= Right;
     if (right)
-        movement += Right; // Rightベクトルは既に水平方向なので変更なし
-
-    // 移動ベクトルがゼロでない場合に正規化
-    if (glm::length(movement) > 0.0001f) // ゼロ除算を避けるための閾値
-    {
+        movement += Right;
+    if (glm::length(movement) > 0.0001f)
         movement = glm::normalize(movement);
-    }
-
     Position += movement * MovementSpeed * deltaTime;
 }
 
@@ -48,10 +35,8 @@ void Camera::processMouseMovement(float xoffset, float yoffset, bool constrainPi
 {
     xoffset *= MouseSensitivity;
     yoffset *= MouseSensitivity;
-
     Yaw += xoffset;
     Pitch += yoffset;
-
     if (constrainPitch)
     {
         if (Pitch > 89.0f)
@@ -59,7 +44,6 @@ void Camera::processMouseMovement(float xoffset, float yoffset, bool constrainPi
         if (Pitch < -89.0f)
             Pitch = -89.0f;
     }
-
     updateCameraVectors();
 }
 
@@ -73,6 +57,7 @@ void Camera::updateCameraVectors()
     Right = glm::normalize(glm::cross(Front, WorldUp));
     Up = glm::normalize(glm::cross(Right, Front));
 }
+
 void Camera::processVerticalMovement(bool up, bool down, float deltaTime)
 {
     if (up)
