@@ -16,6 +16,7 @@
 #include "FontLoader.hpp"   // FontLoaderの宣言のために必要
 #include "TextRenderer.hpp" // TextRendererの宣言のために必要
 #include "input_manager.hpp" // InputManagerの宣言のために必要
+#include "chunk.hpp"        // Chunkクラスの宣言のために必要 (新しく追加)
 
 class Application
 {
@@ -49,14 +50,12 @@ private:
     // 入力マネージャー
     std::unique_ptr<InputManager> m_inputManager;
 
-    // キューブの位置 (グリッドベースの生成に置き換えられるため、このメンバーは使わなくなりますが、互換性のため残します)
-    // std::vector<glm::vec3> m_cubePositions; // 将来的には削除可能
+    // Chunk オブジェクト (ボクセルデータとその管理を委譲)
+    std::unique_ptr<Chunk> m_chunk; // 新しく追加
 
-    // === 新しいボクセルグリッドのメンバー変数 ===
-    std::vector<bool> m_voxelGrid; // 1次元で管理するbool配列 (16*16*16)
+    // === グリッドのサイズと間隔 (Applicationが管理) ===
     int m_gridSize = 16;           // グリッドの各次元のサイズ
     float m_cubeSpacing = 1.0f;    // 立方体間の間隔 (立方体のサイズと一致させる)
-    glm::vec3 m_gridOffset;        // グリッド全体を中央に配置するためのオフセット
 
     // 投影行列
     glm::mat4 m_projectionMatrix;

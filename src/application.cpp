@@ -1,15 +1,16 @@
 #include <glad/glad.h>
 #include "application.hpp" // application.hpp をインクルード
 #include <iostream>
-#include <iomanip>           // std::fixed, std::setprecision のために必要
-#include <sstream>           // std::stringstream のために必要
-#include <random>            // グリッド初期化のため
+#include <iomanip> // std::fixed, std::setprecision のために必要
+#include <sstream> // std::stringstream のために必要
+// <random> はChunkクラスに移動したので、ここでは不要
 #include "opengl_utils.hpp"  // createShaderProgram関数があるヘッダー
 #include "camera.hpp"        // Cameraクラスをインクルード
 #include "timer.hpp"         // Timerクラスをインクルード
 #include "FontLoader.hpp"    // FontLoaderをインクルード
 #include "TextRenderer.hpp"  // TextRendererをインクルード
-#include "input_manager.hpp" // InputManagerをインクルード
+#include "input_manager.hpp" // InputManagerをインクルude
+#include "chunk.hpp"         // Chunkクラスの定義をインクルード
 
 // 静的メンバ変数の初期化
 const float Application::CLEAR_COLOR_R = 0.0f;
@@ -21,11 +22,12 @@ const float Application::CLEAR_COLOR_A = 1.0f;
 Application::Application()
     : m_window(nullptr, glfwDestroyWindow),
       m_VAO(0), m_VBO(0), m_EBO(0), m_shaderProgram(0),
-      m_camera(glm::vec3(0.0f, 0.0f, 3.0f)), // カメラを初期位置に設定
+      m_camera(glm::vec3(0.0f, 0.0f, 0.0f)), // カメラを初期位置に設定
       m_timer(),                             // Timerクラスをデフォルトコンストラクタで初期化
       m_fontLoader(),                        // FontLoaderを初期化
       m_textRenderer(),                      // TextRendererを初期化
-      m_inputManager(nullptr)                // InputManagerはinitializeで初期化
+      m_inputManager(nullptr),               // InputManagerはinitializeで初期化
+      m_chunk(nullptr)                       // Chunkはinitializeで初期化
 {
 }
 
@@ -194,28 +196,20 @@ bool Application::initialize()
         return false;
     }
 
-    // --- ボクセルグリッドの初期化とデータ設定 ---
-    m_voxelGrid.resize(m_gridSize * m_gridSize * m_gridSize);
-
-    // ランダムなグリッドデータを生成
-    std::random_device rd;  // シード生成
-    std::mt19937 gen(rd()); // メルセンヌ・ツイスター法による乱数エンジン
-
-    // 真になる確率を調整 (例: 0.5で50%の確率)
-    std::bernoulli_distribution dist(0.3);
-
-    for (int x = 0; x < m_gridSize; ++x)
+    // --- Chunkの初期化 ---
+    // m_gridSizeはApplication::initialize()で既に定義されているので、これを使用します。
+    // densityはChunkコンストラクタで固定されるか、必要に応じて引数で渡します。
+    try
     {
-        for (int y = 0; y < m_gridSize; ++y)
-        {
-            for (int z = 0; z < m_gridSize; ++z)
-            {
-                size_t index = x + y * m_gridSize + z * m_gridSize * m_gridSize;
-                m_voxelGrid[index] = dist(gen); // 乱数に基づいてtrue/falseを設定
-            }
-        }
+        // 例: サイズ16, 存在する確率0.3 (30%)
+        m_chunk = std::make_unique<Chunk>(m_gridSize, 0.3f); // spacing引数を削除
     }
-    // m_cubePositions はもう使われません
+    catch (const std::exception &e)
+    {
+        std::cerr << "Failed to create Chunk: " << e.what() << std::endl;
+        return false;
+    }
+
 
     if (!m_fontLoader.loadSDFont("../assets/fonts/NotoSansJP-VariableFont_wght.json", "../assets/fonts/noto_sans_jp_atlas.png", m_fontData))
     {
@@ -338,25 +332,33 @@ void Application::render()
     glBindVertexArray(m_VAO); // 一度バインドすればOK
 
     // 各ボクセルを描画
-    for (int x = 0; x < m_gridSize; ++x)
-    {
-        for (int y = 0; y < m_gridSize; ++y)
+    // Chunkクラスからグリッドサイズとボクセルデータを取得
+    if (m_chunk)
+    { // m_chunkが有効であることを確認
+        int chunkSize = m_chunk->getSize();
+        // float cubeSpacing = m_chunk->getSpacing(); // ChunkからgetSpacing()を削除したので、m_cubeSpacingを直接使用
+
+        for (int x = 0; x < chunkSize; ++x)
         {
-            for (int z = 0; z < m_gridSize; ++z)
+            for (int y = 0; y < chunkSize; ++y)
             {
-                size_t index = x + y * m_gridSize + z * m_gridSize * m_gridSize;
-                if (m_voxelGrid[index])
-                { // trueの場合のみ立方体を描画
-                    glm::mat4 model = glm::mat4(1.0f);
+                for (int z = 0; z < chunkSize; ++z)
+                {
+                    if (m_chunk->getVoxel(x, y, z))
+                    { // trueの場合のみ立方体を描画
+                        glm::mat4 model = glm::mat4(1.0f);
 
-                    glm::vec3 cubeWorldPos = glm::vec3(x * m_cubeSpacing, y * m_cubeSpacing, z * m_cubeSpacing);
+                        // グリッド座標をワールド座標に変換し、中心を基準にオフセット
+                        // m_cubeSpacingはApplicationのメンバー変数を使用
+                        glm::vec3 cubeWorldPos = glm::vec3(x * m_cubeSpacing, y * m_cubeSpacing, z * m_cubeSpacing);
 
-                    model = glm::translate(model, cubeWorldPos);
+                        model = glm::translate(model, cubeWorldPos);
 
-                    glUniformMatrix4fv(glGetUniformLocation(m_shaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(model));
+                        glUniformMatrix4fv(glGetUniformLocation(m_shaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(model));
 
-                    // 立方体を描画
-                    glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+                        // 立方体を描画
+                        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+                    }
                 }
             }
         }
