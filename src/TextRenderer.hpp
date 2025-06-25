@@ -1,7 +1,6 @@
 #ifndef TEXT_RENDERER_HPP
 #define TEXT_RENDERER_HPP
 
-#include <glad/glad.h>
 #include <glm/glm.hpp>
 #include <string>
 #include "FontLoader.hpp"

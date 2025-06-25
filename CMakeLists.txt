@@ -11,6 +11,7 @@ file(GLOB_RECURSE SOURCES "${CMAKE_SOURCE_DIR}/src/*.cpp" "${CMAKE_SOURCE_DIR}/s
 # 混乱を避けるため、今回は前者を採用します。
 
 add_executable(${PROJECT_NAME} ${SOURCES})
+add_compile_definitions(GLFW_INCLUDE_NONE)
 
 target_include_directories(${PROJECT_NAME} PUBLIC
     ${CMAKE_SOURCE_DIR}/src
