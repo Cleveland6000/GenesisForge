@@ -1,5 +1,4 @@
 
-#define GLFW_INCLUDE_NONE // これをGLFWの前に置く！
 #include <glad/glad.h>   // これを一番最初に置く
 
 #include "opengl_utils.hpp"
