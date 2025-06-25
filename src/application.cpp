@@ -197,9 +197,6 @@ bool Application::initialize()
     // --- ボクセルグリッドの初期化とデータ設定 ---
     m_voxelGrid.resize(m_gridSize * m_gridSize * m_gridSize);
 
-    // グリッドを中央に配置するためのオフセットを計算
-    m_gridOffset = glm::vec3(m_gridSize / 2.0f, m_gridSize / 2.0f, m_gridSize / 2.0f) * m_cubeSpacing;
-
     // ランダムなグリッドデータを生成
     std::random_device rd;  // シード生成
     std::mt19937 gen(rd()); // メルセンヌ・ツイスター法による乱数エンジン
@@ -352,9 +349,7 @@ void Application::render()
                 { // trueの場合のみ立方体を描画
                     glm::mat4 model = glm::mat4(1.0f);
 
-                    // グリッド座標をワールド座標に変換し、中心を基準にオフセット
                     glm::vec3 cubeWorldPos = glm::vec3(x * m_cubeSpacing, y * m_cubeSpacing, z * m_cubeSpacing);
-                    cubeWorldPos -= m_gridOffset; // グリッド全体を原点中心に移動
 
                     model = glm::translate(model, cubeWorldPos);
 
