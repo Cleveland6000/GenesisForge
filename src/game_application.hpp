@@ -36,7 +36,7 @@ private:
     std::unique_ptr<WindowContext> m_windowContext; // WindowContextを所有するメンバー
 
     // 定数
-    static constexpr int CHUNK_GRID_SIZE = 16;
+    static constexpr int CHUNK_GRID_SIZE = 64;
 
     // 初期化ヘルパーメソッド
     bool setupDependencies();

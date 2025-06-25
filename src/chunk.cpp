@@ -1,6 +1,8 @@
 #include "chunk.hpp"
+#include "Noise/PerlinNoise2D.hpp"
 #include <stdexcept>
 #include <random>
+#include <chrono>
 
 Chunk::Chunk(int size, float density) : m_size(size)
 {
@@ -14,8 +16,11 @@ Chunk::Chunk(int size, float density) : m_size(size)
     }
 
     m_voxels.resize(m_size * m_size * m_size);
-    std::bernoulli_distribution dist(density);
-    std::mt19937 gen(std::random_device{}());
+
+    unsigned int seed = static_cast<unsigned int>(std::chrono::system_clock::now().time_since_epoch().count());
+    PerlinNoise2D perlin(seed);
+
+    float scale = 0.05f;
 
     for (int x = 0; x < m_size; ++x)
     {
@@ -23,7 +28,8 @@ Chunk::Chunk(int size, float density) : m_size(size)
         {
             for (int z = 0; z < m_size; ++z)
             {
-                m_voxels[getIndex(x, y, z)] = dist(gen);
+
+                m_voxels[getIndex(x, y, z)] = (perlin.noise(x * scale, z * scale) * 6) + 5 >= y;
             }
         }
     }
