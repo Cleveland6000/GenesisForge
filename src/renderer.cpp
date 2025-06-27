@@ -2,24 +2,19 @@
 #include <iostream>
 #include <iomanip>
 #include <sstream>
-#include "chunk_mesh_generator.hpp" // これのみ残す
+#include "chunk_mesh_generator.hpp"
 
-
-// コンストラクタは変更なし
 Renderer::Renderer() : m_shaderProgram(0), m_textRenderer() {}
 
-// デストラクタは変更なし
 Renderer::~Renderer()
 {
     glDeleteProgram(m_shaderProgram);
 }
 
-// initialize は変更なし
 bool Renderer::initialize(const FontData &fontData)
 {
     glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE); 
-
+    glEnable(GL_CULL_FACE);
     m_shaderProgram = createShaderProgram("../shaders/basic.vert", "../shaders/basic.frag");
     if (m_shaderProgram == 0)
     {
@@ -43,21 +38,18 @@ void Renderer::beginFrame(const glm::vec4 &clearColor)
 
 void Renderer::renderScene(const glm::mat4 &projection, const glm::mat4 &view, const ChunkRenderData &chunkRenderData)
 {
-    if (chunkRenderData.VAO == 0 || chunkRenderData.indexCount == 0) {
+    if (chunkRenderData.VAO == 0 || chunkRenderData.indexCount == 0)
+    {
         return;
     }
-
-    glUseProgram(m_shaderProgram); 
+    glUseProgram(m_shaderProgram);
     glUniformMatrix4fv(glGetUniformLocation(m_shaderProgram, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
     glUniformMatrix4fv(glGetUniformLocation(m_shaderProgram, "view"), 1, GL_FALSE, glm::value_ptr(view));
-    
     glUniformMatrix4fv(glGetUniformLocation(m_shaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(chunkRenderData.modelMatrix));
-
     glBindVertexArray(chunkRenderData.VAO);
     glDrawElements(GL_TRIANGLES, chunkRenderData.indexCount, GL_UNSIGNED_INT, 0);
-    glBindVertexArray(0); 
+    glBindVertexArray(0);
 }
-
 
 void Renderer::renderOverlay(int screenWidth, int screenHeight, const std::string &fpsString, const std::string &positionString)
 {
