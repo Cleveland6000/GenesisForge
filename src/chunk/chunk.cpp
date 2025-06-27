@@ -1,7 +1,7 @@
 #include "chunk.hpp"
 #include <stdexcept>
 
-Chunk::Chunk(int size) : m_size(size)
+Chunk::Chunk(int size) : m_size(size), m_isDirty(true)
 {
     if (size <= 0)
     {
@@ -13,6 +13,7 @@ Chunk::Chunk(int size) : m_size(size)
 void Chunk::setVoxel(int x, int y, int z, bool value)
 {
     m_voxels[getIndex(x, y, z)] = value;
+    m_isDirty = true;
 }
 
 size_t Chunk::getIndex(int x, int y, int z) const

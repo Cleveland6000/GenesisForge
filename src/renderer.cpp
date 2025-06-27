@@ -2,7 +2,72 @@
 #include <iostream>
 #include <iomanip>
 #include <sstream>
+#include "cube_data.hpp" // !!!ここを追加!!!
+struct ChunkRenderData
+{
+    GLuint VAO = 0;
+    GLuint VBO = 0;
+    GLuint EBO = 0;
+    GLsizei indexCount = 0; // このチャンクメッシュのインデックス数
 
+    // チャンクのモデル行列（ワールド空間でのチャンクの位置を定義）
+    // 後でこの行列を使って、チャンク全体を移動させます。
+    glm::mat4 modelMatrix = glm::mat4(1.0f);
+
+    // コンストラクタで初期化とデストラクタで解放を行うことで、
+    // ChunkRenderDataオブジェクトの寿命とOpenGLリソースの寿命を紐付けます。
+    ChunkRenderData() = default; // デフォルトコンストラクタ
+
+    // OpenGLリソースの解放
+    ~ChunkRenderData()
+    {
+        if (VAO != 0)
+            glDeleteVertexArrays(1, &VAO);
+        if (VBO != 0)
+            glDeleteBuffers(1, &VBO);
+        if (EBO != 0)
+            glDeleteBuffers(1, &EBO);
+    }
+
+    // コピーは禁止し、ムーブは許可する（パフォーマンスと安全のため）
+    ChunkRenderData(const ChunkRenderData &) = delete;
+    ChunkRenderData &operator=(const ChunkRenderData &) = delete;
+    ChunkRenderData(ChunkRenderData &&other) noexcept
+        : VAO(other.VAO), VBO(other.VBO), EBO(other.EBO), indexCount(other.indexCount), modelMatrix(other.modelMatrix)
+    {
+        other.VAO = 0; // 移動元を無効化
+        other.VBO = 0;
+        other.EBO = 0;
+        other.indexCount = 0;
+    }
+    ChunkRenderData &operator=(ChunkRenderData &&other) noexcept
+    {
+        if (this != &other)
+        {
+            // 既存のリソースを解放
+            if (VAO != 0)
+                glDeleteVertexArrays(1, &VAO);
+            if (VBO != 0)
+                glDeleteBuffers(1, &VBO);
+            if (EBO != 0)
+                glDeleteBuffers(1, &EBO);
+
+            // リソースを移動
+            VAO = other.VAO;
+            VBO = other.VBO;
+            EBO = other.EBO;
+            indexCount = other.indexCount;
+            modelMatrix = other.modelMatrix;
+
+            // 移動元を無効化
+            other.VAO = 0;
+            other.VBO = 0;
+            other.EBO = 0;
+            other.indexCount = 0;
+        }
+        return *this;
+    }
+};
 Renderer::Renderer() : m_VAO(0), m_VBO(0), m_EBO(0), m_shaderProgram(0), m_textRenderer() {}
 
 Renderer::~Renderer()
@@ -17,27 +82,14 @@ bool Renderer::initialize(const FontData &fontData)
 {
     glEnable(GL_DEPTH_TEST);
 
-    float vertices[] = {
-        0.5f, 0.5f, -0.5f, 1.0f, 0.0f, 0.0f,
-        0.5f, -0.5f, -0.5f, 0.0f, 1.0f, 0.0f,
-        -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 1.0f,
-        -0.5f, 0.5f, -0.5f, 1.0f, 1.0f, 0.0f,
-        0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 1.0f,
-        0.5f, -0.5f, 0.5f, 1.0f, 0.0f, 1.0f,
-        -0.5f, -0.5f, 0.5f, 0.5f, 0.5f, 0.5f,
-        -0.5f, 0.5f, 0.5f, 0.8f, 0.2f, 0.6f};
-    unsigned int indices[] = {
-        2, 1, 0, 0, 3, 2, 6, 5, 4, 4, 7, 6, 7, 3, 2, 2, 6, 7,
-        0, 1, 5, 5, 4, 0, 3, 0, 4, 4, 7, 3, 2, 6, 5, 5, 1, 2};
-
     glGenVertexArrays(1, &m_VAO);
     glGenBuffers(1, &m_VBO);
     glGenBuffers(1, &m_EBO);
     glBindVertexArray(m_VAO);
     glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, CUBE_VERTICES_SIZE, CUBE_VERTICES, GL_STATIC_DRAW);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, CUBE_INDICES_SIZE, CUBE_INDICES, GL_STATIC_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)(3 * sizeof(float)));
@@ -67,7 +119,6 @@ void Renderer::beginFrame(const glm::vec4 &clearColor)
 
 void Renderer::renderScene(const glm::mat4 &projection, const glm::mat4 &view, const Chunk &chunk, float cubeSpacing)
 {
-
     glUseProgram(m_shaderProgram);
     glUniformMatrix4fv(glGetUniformLocation(m_shaderProgram, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
     glUniformMatrix4fv(glGetUniformLocation(m_shaderProgram, "view"), 1, GL_FALSE, glm::value_ptr(view));
@@ -84,7 +135,8 @@ void Renderer::renderScene(const glm::mat4 &projection, const glm::mat4 &view, c
                 {
                     glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(x * cubeSpacing, y * cubeSpacing, z * cubeSpacing));
                     glUniformMatrix4fv(glGetUniformLocation(m_shaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(model));
-                    glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+
+                    glDrawElements(GL_TRIANGLES, CUBE_INDEX_COUNT, GL_UNSIGNED_INT, 0);
                 }
             }
         }
