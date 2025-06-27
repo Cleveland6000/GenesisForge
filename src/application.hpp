@@ -13,7 +13,7 @@
 #include "time/timer.hpp"
 #include "input_manager.hpp"
 #include "fullscreen_manager.hpp"
-#include "chunk.hpp"
+#include "chunk/chunk.hpp"
 #include "FontLoader.hpp" // FontData のために必要
 #include "renderer.hpp"
 

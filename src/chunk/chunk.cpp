@@ -1,7 +1,5 @@
 #include "chunk.hpp"
-#include "noise/PerlinNoise2D.hpp"
 #include <stdexcept>
-#include <chrono>
 
 Chunk::Chunk(int size) : m_size(size)
 {
@@ -9,25 +7,12 @@ Chunk::Chunk(int size) : m_size(size)
     {
         throw std::invalid_argument("Chunk size must be positive.");
     }
-
     m_voxels.resize(m_size * m_size * m_size);
+}
 
-    unsigned int seed = static_cast<unsigned int>(std::chrono::system_clock::now().time_since_epoch().count());
-    PerlinNoise2D perlin(seed);
-
-    float scale = 0.05f;
-
-    for (int x = 0; x < m_size; ++x)
-    {
-        for (int y = 0; y < m_size; ++y)
-        {
-            for (int z = 0; z < m_size; ++z)
-            {
-
-                m_voxels[getIndex(x, y, z)] = (perlin.noise(x * scale, z * scale) * 6) + 5 >= y;
-            }
-        }
-    }
+void Chunk::setVoxel(int x, int y, int z, bool value)
+{
+    m_voxels[getIndex(x, y, z)] = value;
 }
 
 size_t Chunk::getIndex(int x, int y, int z) const

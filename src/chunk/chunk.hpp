@@ -9,6 +9,7 @@ class Chunk
 public:
     Chunk(int size);
     bool getVoxel(int x, int y, int z) const;
+    void setVoxel(int x, int y, int z, bool value);
     int getSize() const { return m_size; }
 
 private:

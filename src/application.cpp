@@ -6,6 +6,8 @@
 #include <iostream>
 #include <iomanip>
 #include <sstream>
+#include "noise/PerlinNoise2D.hpp"
+#include <chrono>
 
 const float Application::CLEAR_COLOR_R = 0.0f, Application::CLEAR_COLOR_G = 0.0f, Application::CLEAR_COLOR_B = 0.0f, Application::CLEAR_COLOR_A = 1.0f;
 
@@ -28,7 +30,6 @@ Application::Application(std::unique_ptr<WindowContext> windowContext, // Window
       m_renderer(std::move(renderer)),
       m_fontLoader(std::move(fontLoader))
 {
-    std::cout << "--- Application constructor called. ---\n";
 }
 
 Application::~Application() {
@@ -71,9 +72,6 @@ bool Application::initialize()
     return true;
 }
 
-// ★initGLFW() は削除★
-// ★createWindowAndContext() は削除★
-
 void Application::setupCallbacks()
 {
     // WindowContextのコールバックセッターを利用して登録
@@ -98,6 +96,25 @@ bool Application::initializeManagersAndLoadResources()
         std::cerr << "One or more managers/resources not provided via DI.\n";
         return false;
     }
+
+
+    unsigned int seed = static_cast<unsigned int>(std::chrono::system_clock::now().time_since_epoch().count());
+    PerlinNoise2D perlin(seed);
+    float scale = 0.05f;
+    int m_size = m_chunk->getSize();
+    for (int x = 0; x < m_size; ++x)
+    {
+        for (int y = 0; y < m_size; ++y)
+        {
+            for (int z = 0; z < m_size; ++z)
+            {
+                m_chunk->setVoxel(x, y, z, (perlin.noise(x * scale, z * scale) * 6) + 5 >= y);
+            }
+        }
+    }
+
+
+
 
     // InputManager にウィンドウポインタを設定 (WindowContextから取得)
     m_inputManager->setWindow(m_windowContext->getWindow());
@@ -190,10 +207,6 @@ void Application::render()
     m_renderer->renderOverlay(w, h, m_fpsString, m_positionString);
     m_renderer->endFrame();
 }
-
-// WindowContextがコールバックを処理するので、Applicationの静的コールバック関数は不要
-// staticFramebufferSizeCallback は WindowContext に移動済み
-// staticMouseCallback は WindowContext に移動済み
 
 void Application::updateProjectionMatrix(int width, int height)
 {

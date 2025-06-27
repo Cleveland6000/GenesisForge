@@ -10,7 +10,7 @@
 #include <vector>
 #include "FontLoader.hpp"
 #include "TextRenderer.hpp"
-#include "chunk.hpp"
+#include "chunk/chunk.hpp"
 #include "opengl_utils.hpp"
 
 struct VoxelRenderInfo
