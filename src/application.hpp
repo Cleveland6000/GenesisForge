@@ -24,7 +24,10 @@ public:
     void run();
 
 private:
-    static const float CLEAR_COLOR_R, CLEAR_COLOR_G, CLEAR_COLOR_B, CLEAR_COLOR_A;
+    static const float CLEAR_COLOR_R = 0.0f;
+    static const float CLEAR_COLOR_G = 0.0f;
+    static const float CLEAR_COLOR_B = 0.0f;
+    static const float CLEAR_COLOR_A = 1.0f;
     std::unique_ptr<WindowContext> m_windowContext;
     std::unique_ptr<Camera> m_camera;
     std::unique_ptr<Timer> m_timer;
