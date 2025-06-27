@@ -7,6 +7,7 @@
 #include "chunk/chunk.hpp"
 #include "chunk_mesh_generator.hpp" // ChunkMeshData, ChunkRenderData のために必要
 #include "chunk_renderer.hpp"     // ChunkMeshData, ChunkRenderData のために必要
+#include "noise/perlin_noise_2d.hpp" // PerlinNoise2D のために必要
 
 // チャンクのワールド座標をキーとするハッシュ関数
 struct Vec3iHash {
@@ -17,7 +18,8 @@ struct Vec3iHash {
 
 class ChunkManager {
 public:
-    ChunkManager(int chunkSize, float noiseScale, int renderDistance);
+    // コンストラクタにノイズシードを追加
+    ChunkManager(int chunkSize, float noiseScale, int renderDistance, unsigned int noiseSeed);
     ~ChunkManager();
 
     // プレイヤーの位置に基づいてチャンクを更新（ロード/アンロード）
@@ -38,6 +40,8 @@ private:
     int m_chunkSize;
     float m_noiseScale;
     int m_renderDistance; // プレイヤーからどれくらいの距離までチャンクをロードするか
+    
+    std::unique_ptr<PerlinNoise2D> m_perlinNoise; // PerlinNoise2D のインスタンスをメンバとして保持
 
     // キーはチャンクのワールド座標（例: (0,0,0), (1,0,0) など、チャンクごとの原点）
     std::unordered_map<glm::ivec3, std::shared_ptr<Chunk>, Vec3iHash> m_chunks;

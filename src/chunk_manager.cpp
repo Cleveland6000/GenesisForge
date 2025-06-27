@@ -1,12 +1,13 @@
 #include "chunk_manager.hpp"
-#include "noise/perlin_noise_2d.hpp"
+// #include "noise/perlin_noise_2d.hpp" // ヘッダで既に含まれているので不要
 #include <iostream>
 #include <chrono>
 #include "chunk_mesh_generator.hpp" // ChunkMeshGenerator::generateMesh を使用するため、インクルードが必要
 
-// コンストラクタ
-ChunkManager::ChunkManager(int chunkSize, float noiseScale, int renderDistance)
-    : m_chunkSize(chunkSize), m_noiseScale(noiseScale), m_renderDistance(renderDistance)
+// コンストラクタ: noiseSeed 引数を受け取り、PerlinNoise2D を初期化
+ChunkManager::ChunkManager(int chunkSize, float noiseScale, int renderDistance, unsigned int noiseSeed)
+    : m_chunkSize(chunkSize), m_noiseScale(noiseScale), m_renderDistance(renderDistance),
+      m_perlinNoise(std::make_unique<PerlinNoise2D>(noiseSeed)) // PerlinNoise2D をここで初期化
 {
     std::cout << "ChunkManager constructor called. ChunkSize: " << m_chunkSize << ", RenderDistance: " << m_renderDistance << std::endl;
 }
@@ -58,11 +59,13 @@ std::shared_ptr<Chunk> ChunkManager::generateChunk(const glm::ivec3& chunkCoord)
     std::cout << "Generating chunk at: (" << chunkCoord.x << ", " << chunkCoord.y << ", " << chunkCoord.z << ")\n";
     std::shared_ptr<Chunk> newChunk = std::make_shared<Chunk>(m_chunkSize);
 
-    // Perlinノイズを使用してチャンクの内容を生成
-    // ここで生成される地形は、シードが固定されていないと毎回異なることに注意してください。
-    // ワールド全体で一貫した地形が必要な場合は、シードを固定するか、ChunkManagerのコンストラクタで受け取るべきです。
-    unsigned int seed = static_cast<unsigned int>(std::chrono::system_clock::now().time_since_epoch().count());
-    PerlinNoise2D perlin(seed); 
+    // ChunkManager の m_perlinNoise メンバを使用
+    // PerlinNoise2D perlin(seed); // この行は削除
+    
+    if (!m_perlinNoise) {
+        std::cerr << "Error: PerlinNoise2D instance is not initialized in ChunkManager.\n";
+        return newChunk; // エラー処理、または適切に初期化されていることを保証
+    }
 
     for (int x = 0; x < m_chunkSize; ++x) {
         for (int y = 0; y < m_chunkSize; ++y) {
@@ -71,8 +74,8 @@ std::shared_ptr<Chunk> ChunkManager::generateChunk(const glm::ivec3& chunkCoord)
                 float worldX = (float)x + (float)chunkCoord.x * m_chunkSize;
                 float worldZ = (float)z + (float)chunkCoord.z * m_chunkSize;
 
-                // ノイズ値に基づいてボクセルを設定
-                bool isSolid = (perlin.noise(worldX * m_noiseScale, worldZ * m_noiseScale) * (m_chunkSize / 2) + (m_chunkSize / 2) >= y);
+                // m_perlinNoise のインスタンスを使用してノイズ値を生成
+                bool isSolid = (m_perlinNoise->noise(worldX * m_noiseScale, worldZ * m_noiseScale) * (m_chunkSize / 2) + (m_chunkSize / 2) >= y);
                 newChunk->setVoxel(x, y, z, isSolid);
             }
         }

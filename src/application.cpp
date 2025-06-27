@@ -4,9 +4,6 @@
 #include <iomanip>
 #include <sstream>
 #include <chrono>
-// #include "noise/perlin_noise_2d.hpp" // ChunkManagerが使用するので不要
-// #include "chunk_mesh_generator.hpp"   // ChunkManagerが使用するので不要
-// #include "chunk_renderer.hpp"         // ChunkManagerが使用するので不要
 
 #define SCR_WIDTH 800
 #define SCR_HEIGHT 600
@@ -51,14 +48,12 @@ bool Application::initialize()
     }
 
     // 初期チャンクのロードをトリガー
-    // これにより、ゲーム開始時にプレイヤーの初期位置に基づいてチャンクがロードされます
     if (m_chunkManager) {
         m_chunkManager->update(m_camera->getPosition());
     } else {
         std::cerr << "Error: ChunkManager is null in Application::initialize after setupDependenciesAndLoadResources.\n";
         return false;
     }
-
 
     int initialWidth, initialHeight;
     glfwGetFramebufferSize(m_windowContext->getWindow(), &initialWidth, &initialHeight);
@@ -151,15 +146,14 @@ bool Application::setupDependenciesAndLoadResources()
     }
     std::cout << "FontData unique_ptr created.\n";
 
-    // ChunkManager の初期化
-    m_chunkManager = std::make_unique<ChunkManager>(CHUNK_GRID_SIZE, NOISE_SCALE, RENDER_DISTANCE_CHUNKS);
+    // ChunkManager の初期化時に WORLD_SEED を渡す
+    m_chunkManager = std::make_unique<ChunkManager>(CHUNK_GRID_SIZE, NOISE_SCALE, RENDER_DISTANCE_CHUNKS, WORLD_SEED);
     if (!m_chunkManager)
     {
         std::cerr << "Application: Failed to create ChunkManager.\n";
         return false;
     }
-    std::cout << "ChunkManager created.\n";
-
+    std::cout << "ChunkManager created with WORLD_SEED.\n";
 
     m_renderer = std::make_unique<Renderer>();
     if (!m_renderer)
@@ -235,6 +229,7 @@ void Application::updateFpsAndPositionStrings()
     ss << std::fixed << std::setprecision(2) << "Pos: X: " << pos.x << " Y: " << pos.y << " Z: " << pos.z;
     m_positionString = ss.str();
 }
+
 void Application::render()
 {
     if (!m_renderer)
@@ -274,6 +269,7 @@ void Application::render()
 
     m_renderer->endFrame();
 }
+
 void Application::updateProjectionMatrix(int width, int height)
 {
     if (width == 0 || height == 0)
