@@ -1,7 +1,7 @@
 #ifndef RENDERER_HPP
 #define RENDERER_HPP
 
-#include <glad/glad.h>   // これを一番最初に置く
+#include <glad/glad.h> // これを一番最初に置く
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -28,6 +28,7 @@ public:
     void renderScene(const glm::mat4 &projection, const glm::mat4 &view, const Chunk &chunk, float cubeSpacing);
     void renderOverlay(int screenWidth, int screenHeight, const std::string &fpsString, const std::string &positionString);
     void endFrame();
+
 
 private:
     GLuint m_VAO, m_VBO, m_EBO, m_shaderProgram;

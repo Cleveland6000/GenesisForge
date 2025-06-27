@@ -1,8 +1,7 @@
 #include <GLFW/glfw3.h>
 #include "timer.hpp"
 
-Timer::Timer()
-    : m_lastFrameTime(0.0f), m_deltaTime(0.0f), m_totalTime(0.0f)
+Timer::Timer() : m_lastFrameTime(0.0f), m_deltaTime(0.0f), m_totalTime(0.0f)
 {
     m_lastFrameTime = static_cast<float>(glfwGetTime());
 }

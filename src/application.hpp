@@ -10,7 +10,7 @@
 
 // 依存オブジェクトのヘッダー
 #include "camera.hpp"
-#include "timer.hpp"
+#include "time/timer.hpp"
 #include "input_manager.hpp"
 #include "fullscreen_manager.hpp"
 #include "chunk.hpp"

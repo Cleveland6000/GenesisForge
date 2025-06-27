@@ -1,18 +1,13 @@
 #include "chunk.hpp"
-#include "Noise/PerlinNoise2D.hpp"
+#include "noise/PerlinNoise2D.hpp"
 #include <stdexcept>
-#include <random>
 #include <chrono>
 
-Chunk::Chunk(int size, float density) : m_size(size)
+Chunk::Chunk(int size) : m_size(size)
 {
     if (size <= 0)
     {
         throw std::invalid_argument("Chunk size must be positive.");
-    }
-    if (density < 0.0f || density > 1.0f)
-    {
-        throw std::invalid_argument("Voxel density must be between 0.0 and 1.0.");
     }
 
     m_voxels.resize(m_size * m_size * m_size);

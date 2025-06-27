@@ -7,7 +7,7 @@
 class Chunk
 {
 public:
-    Chunk(int size, float density);
+    Chunk(int size);
     bool getVoxel(int x, int y, int z) const;
     int getSize() const { return m_size; }
 
