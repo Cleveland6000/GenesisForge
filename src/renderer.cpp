@@ -1,111 +1,71 @@
 #include "renderer.hpp"
 #include <iostream>
-#include <glm/gtc/type_ptr.hpp> // glm::value_ptr のために必要
+#include <iomanip>
+#include <sstream>
+#include "chunk_mesh_generator.hpp" // これのみ残す
 
-// コンストラクタ
-Renderer::Renderer() {
-    std::cout << "Renderer: Constructor called.\n";
+
+// コンストラクタは変更なし
+Renderer::Renderer() : m_shaderProgram(0), m_textRenderer() {}
+
+// デストラクタは変更なし
+Renderer::~Renderer()
+{
+    glDeleteProgram(m_shaderProgram);
 }
 
-// デストラクタ
-Renderer::~Renderer() {
-    std::cout << "Renderer: Destructor called.\n";
-    // TextRenderer のテクスチャは TextRenderer クラスが管理する
-}
+// initialize は変更なし
+bool Renderer::initialize(const FontData &fontData)
+{
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE); 
 
-// レンダラーの初期化
-bool Renderer::initialize(const FontData& fontData) {
-    // キューブシェーダーをコンパイル
-    m_cubeShader = std::make_unique<Shader>("../assets/shaders/CubeVertexShader.glsl", "../assets/shaders/CubeFragmentShader.glsl");
-    if (!m_cubeShader->getID()) {
-        std::cerr << "Renderer: Failed to compile cube shader.\n";
+    m_shaderProgram = createShaderProgram("../shaders/basic.vert", "../shaders/basic.frag");
+    if (m_shaderProgram == 0)
+    {
+        std::cerr << "Failed to create shader program for Renderer\n";
         return false;
     }
-    std::cout << "Renderer: Cube shader compiled.\n";
-
-    // テキストレンダラーを初期化
-    m_textRenderer = std::make_unique<TextRenderer>();
-    if (!m_textRenderer->initialize("../assets/shaders/TextVertexShader.glsl", "../assets/shaders/TextFragmentShader.glsl")) {
-        std::cerr << "Renderer: Failed to initialize text renderer.\n";
+    m_fontData = fontData;
+    if (!m_textRenderer.initialize("../shaders/text.vert", "../shaders/text.frag", m_fontData))
+    {
+        std::cerr << "Failed to initialize TextRenderer in Renderer.\n";
         return false;
     }
-    std::cout << "Renderer: Text renderer initialized.\n";
-
-    // フォントアトラステクスチャを設定
-    m_fontAtlasTextureID = fontData.atlasTextureID;
-    if (m_fontAtlasTextureID == 0) {
-        std::cerr << "Renderer: Invalid font atlas texture ID received.\n";
-        return false;
-    }
-    std::cout << "Renderer: Font atlas texture ID set: " << m_fontAtlasTextureID << "\n";
-
-    // OpenGLの設定
-    glEnable(GL_DEPTH_TEST); // 深度テストを有効にする
-    glEnable(GL_CULL_FACE);  // カリングを有効にする
-    glCullFace(GL_BACK);    // バックフェースをカリング
-
-    checkOpenGLError("initialize end");
-    std::cout << "Renderer: Initialized successfully.\n";
     return true;
 }
 
-// フレームの開始
-void Renderer::beginFrame(const glm::vec4& clearColor) {
+void Renderer::beginFrame(const glm::vec4 &clearColor)
+{
     glClearColor(clearColor.r, clearColor.g, clearColor.b, clearColor.a);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // カラーバッファと深度バッファをクリア
-    checkOpenGLError("beginFrame");
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
-// シーンのレンダリング
-void Renderer::renderScene(const glm::mat4 &projection, const glm::mat4 &view, 
-                         const ChunkRenderData &chunkRenderData, const glm::vec3& chunkWorldPosition) {
-    m_cubeShader->use(); // キューブシェーダーを使用
+void Renderer::renderScene(const glm::mat4 &projection, const glm::mat4 &view, const ChunkRenderData &chunkRenderData)
+{
+    if (chunkRenderData.VAO == 0 || chunkRenderData.indexCount == 0) {
+        return;
+    }
 
-    // モデル行列を作成: チャンクのワールド位置に平行移動
-    glm::mat4 model = glm::mat4(1.0f);
-    model = glm::translate(model, chunkWorldPosition);
+    glUseProgram(m_shaderProgram); 
+    glUniformMatrix4fv(glGetUniformLocation(m_shaderProgram, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+    glUniformMatrix4fv(glGetUniformLocation(m_shaderProgram, "view"), 1, GL_FALSE, glm::value_ptr(view));
+    
+    glUniformMatrix4fv(glGetUniformLocation(m_shaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(chunkRenderData.modelMatrix));
 
-    // シェーダーにユニフォーム変数を設定
-    m_cubeShader->setMat4("projection", projection);
-    m_cubeShader->setMat4("view", view);
-    m_cubeShader->setMat4("model", model); // モデル行列を設定
-
-    // チャンクのVAOをバインドして描画コマンドを発行
     glBindVertexArray(chunkRenderData.VAO);
     glDrawElements(GL_TRIANGLES, chunkRenderData.indexCount, GL_UNSIGNED_INT, 0);
-    glBindVertexArray(0); // VAOのバインドを解除
-
-    checkOpenGLError("renderScene");
+    glBindVertexArray(0); 
 }
 
-// オーバーレイのレンダリング
-void Renderer::renderOverlay(int screenWidth, int screenHeight, const std::string& fpsString, const std::string& positionString) {
-    // 2DレンダリングのためにOpenGLの状態を変更
-    glDisable(GL_DEPTH_TEST); // 深度テストを無効にする
-    glDisable(GL_CULL_FACE);  // カリングも無効にする（2Dテキストには不要）
-    glEnable(GL_BLEND);       // ブレンディングを有効にする
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // アルファブレンディングの設定
 
-    m_textRenderer->renderText(m_fontAtlasTextureID, fpsString, 10.0f, static_cast<float>(screenHeight) - 30.0f, 0.5f, glm::vec3(1.0f, 1.0f, 1.0f));
-    m_textRenderer->renderText(m_fontAtlasTextureID, positionString, 10.0f, static_cast<float>(screenHeight) - 60.0f, 0.5f, glm::vec3(1.0f, 1.0f, 1.0f));
-
-    // シーンレンダリングのためにOpenGLの状態を元に戻す
-    glEnable(GL_DEPTH_TEST); // 深度テストを再度有効にする
-    glEnable(GL_CULL_FACE);  // カリングを再度有効にする
-    glDisable(GL_BLEND);      // ブレンディングを無効にする
-    checkOpenGLError("renderOverlay");
+void Renderer::renderOverlay(int screenWidth, int screenHeight, const std::string &fpsString, const std::string &positionString)
+{
+    glm::mat4 orthoProjection = glm::ortho(0.0f, (float)screenWidth, 0.0f, (float)screenHeight);
+    const float TARGET_TEXT_HEIGHT_PX = 60.0f;
+    float textScale = m_fontData.baseFontSize > 0 ? TARGET_TEXT_HEIGHT_PX / (float)m_fontData.baseFontSize : 1.0f;
+    m_textRenderer.renderText(fpsString, 10.0f, (float)screenHeight - 60.0f, textScale, glm::vec3(1.0f), orthoProjection);
+    m_textRenderer.renderText(positionString, 10.0f, (float)screenHeight - 60.0f - (TARGET_TEXT_HEIGHT_PX + 10.0f), textScale, glm::vec3(1.0f), orthoProjection);
 }
 
-// フレームの終了
-void Renderer::endFrame() {
-    // 特に何もなし（swapBuffersとpollEventsはApplicationクラスが担当）
-}
-
-// OpenGLエラーチェック
-void Renderer::checkOpenGLError(const std::string& functionName) {
-    GLenum error;
-    while ((error = glGetError()) != GL_NO_ERROR) {
-        std::cerr << "OpenGL Error in " << functionName << ": " << error << std::endl;
-    }
-}
-
+void Renderer::endFrame() {}

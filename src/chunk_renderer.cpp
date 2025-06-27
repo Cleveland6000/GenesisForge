@@ -42,22 +42,3 @@ ChunkRenderData ChunkRenderer::createChunkRenderData(const ChunkMeshData& meshDa
 
     return renderData;
 }
-
-void ChunkRenderer::deleteChunkRenderData(ChunkRenderData& renderData) {
-    // VAO, VBO, EBO が有効な場合に削除します
-    if (renderData.VAO != 0) {
-        glDeleteVertexArrays(1, &renderData.VAO);
-        renderData.VAO = 0; // 無効化
-    }
-    if (renderData.VBO != 0) {
-        glDeleteBuffers(1, &renderData.VBO);
-        renderData.VBO = 0; // 無効化
-    }
-    if (renderData.EBO != 0) {
-        glDeleteBuffers(1, &renderData.EBO);
-        renderData.EBO = 0; // 無効化
-    }
-    renderData.indexCount = 0; // インデックス数もリセット
-    // std::cout << "ChunkRenderData resources deleted.\n"; // デバッグ用
-}
-
