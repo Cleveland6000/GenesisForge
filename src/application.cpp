@@ -146,14 +146,21 @@ bool Application::setupDependenciesAndLoadResources()
     }
     std::cout << "FontData unique_ptr created.\n";
 
-    // ChunkManager の初期化時に WORLD_SEED, WORLD_MAX_HEIGHT, GROUND_LEVEL を渡す
-    m_chunkManager = std::make_unique<ChunkManager>(CHUNK_GRID_SIZE, NOISE_SCALE, RENDER_DISTANCE_CHUNKS, WORLD_SEED, WORLD_MAX_HEIGHT, GROUND_LEVEL);
+    // ChunkManager の初期化時に、地形生成関連のパラメータも渡す
+    m_chunkManager = std::make_unique<ChunkManager>(
+        CHUNK_GRID_SIZE, 
+        RENDER_DISTANCE_CHUNKS, 
+        WORLD_SEED, 
+        NOISE_SCALE, 
+        WORLD_MAX_HEIGHT, 
+        GROUND_LEVEL
+    );
     if (!m_chunkManager)
     {
         std::cerr << "Application: Failed to create ChunkManager.\n";
         return false;
     }
-    std::cout << "ChunkManager created with WORLD_SEED, WORLD_MAX_HEIGHT, GROUND_LEVEL.\n";
+    std::cout << "ChunkManager created with terrain generation parameters.\n";
 
     m_renderer = std::make_unique<Renderer>();
     if (!m_renderer)
