@@ -2,12 +2,13 @@
 #include <iostream>
 #include <chrono>
 #include "chunk_mesh_generator.hpp"
-// #include "noise/perlin_noise_2d.hpp" // TerrainGenerator が持つため不要
 
-// コンストラクタ: noiseSeed, noiseScale, worldMaxHeight, groundLevel を TerrainGenerator に渡す
-ChunkManager::ChunkManager(int chunkSize, int renderDistance, unsigned int noiseSeed, float noiseScale, int worldMaxHeight, int groundLevel)
+// コンストラクタ: TerrainGenerator のコンストラクタに新しい引数を渡す
+ChunkManager::ChunkManager(int chunkSize, int renderDistance, unsigned int noiseSeed, float noiseScale, 
+                           int worldMaxHeight, int groundLevel, int octaves, float lacunarity, float persistence)
     : m_chunkSize(chunkSize), m_renderDistance(renderDistance),
-      m_terrainGenerator(std::make_unique<TerrainGenerator>(noiseSeed, noiseScale, worldMaxHeight, groundLevel)) // TerrainGenerator をここで初期化
+      m_terrainGenerator(std::make_unique<TerrainGenerator>(noiseSeed, noiseScale, worldMaxHeight, groundLevel,
+                                                          octaves, lacunarity, persistence)) // TerrainGenerator をここで初期化
 {
     std::cout << "ChunkManager constructor called. ChunkSize: " << m_chunkSize 
               << ", RenderDistance: " << m_renderDistance << std::endl;
@@ -88,8 +89,6 @@ void ChunkManager::updateChunkMesh(const glm::ivec3& chunkCoord, std::shared_ptr
 void ChunkManager::loadChunksInArea(const glm::ivec3& centerChunkCoord) {
     for (int x = -m_renderDistance; x <= m_renderDistance; ++x) {
         for (int z = -m_renderDistance; z <= m_renderDistance; ++z) {
-            // Y軸は通常、高さ方向に無限であるか、固定された範囲であるため、2Dのロード範囲とする
-            // 必要に応じてY軸方向もロード範囲に含める
             glm::ivec3 currentChunkCoord = glm::ivec3(centerChunkCoord.x + x, 0, centerChunkCoord.z + z); // Y座標は仮に0とする
 
             if (!hasChunk(currentChunkCoord)) {

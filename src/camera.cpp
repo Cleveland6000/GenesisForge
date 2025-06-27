@@ -61,7 +61,7 @@ void Camera::updateCameraVectors()
 void Camera::processVerticalMovement(bool up, bool down, float deltaTime)
 {
     if (up)
-        Position += WorldUp * MovementSpeed * deltaTime;
+        Position += WorldUp * MovementSpeed * deltaTime * 2.0f;
     if (down)
-        Position -= WorldUp * MovementSpeed * deltaTime;
+        Position -= WorldUp * MovementSpeed * deltaTime * 2.0f;
 }

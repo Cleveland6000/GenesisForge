@@ -146,21 +146,24 @@ bool Application::setupDependenciesAndLoadResources()
     }
     std::cout << "FontData unique_ptr created.\n";
 
-    // ChunkManager の初期化時に、地形生成関連のパラメータも渡す
+    // ChunkManager の初期化時に、地形生成関連のパラメータとオクターブ設定を渡す
     m_chunkManager = std::make_unique<ChunkManager>(
         CHUNK_GRID_SIZE, 
         RENDER_DISTANCE_CHUNKS, 
         WORLD_SEED, 
         NOISE_SCALE, 
         WORLD_MAX_HEIGHT, 
-        GROUND_LEVEL
+        GROUND_LEVEL,
+        TERRAIN_OCTAVES,       // オクターブ数
+        TERRAIN_LACUNARITY,    // ラキュナリティ
+        TERRAIN_PERSISTENCE    // パーシスタンス
     );
     if (!m_chunkManager)
     {
         std::cerr << "Application: Failed to create ChunkManager.\n";
         return false;
     }
-    std::cout << "ChunkManager created with terrain generation parameters.\n";
+    std::cout << "ChunkManager created with terrain generation parameters and octaves.\n";
 
     m_renderer = std::make_unique<Renderer>();
     if (!m_renderer)
