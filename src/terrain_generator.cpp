@@ -24,47 +24,38 @@ TerrainGenerator::TerrainGenerator(unsigned int noiseSeed, float noiseScale, int
               << ", Persistence: " << m_persistence << std::endl;
 }
 
-bool TerrainGenerator::isVoxelSolid(float worldX, float worldY, float worldZ) const {
+// ワールドX, Z座標における地形の高さを返す新しいメソッド
+int TerrainGenerator::getTerrainHeight(float worldX, float worldZ) const {
     if (!m_perlinNoise) {
-        return false; 
+        return 0; // または適切なデフォルト値
     }
 
     double totalNoise = 0.0;
-    double maxAmplitude = 0.0; // 正規化のための最大振幅の合計
+    double maxAmplitude = 0.0;
     double currentAmplitude = 1.0;
     double currentFrequency = 1.0;
 
     // 複数のオクターブを組み合わせてノイズを計算
     for (int i = 0; i < m_octaves; ++i) {
-        // 現在の周波数と振幅でノイズを計算し、合計に加える
         totalNoise += m_perlinNoise->noise(worldX * m_noiseScale * currentFrequency, worldZ * m_noiseScale * currentFrequency) * currentAmplitude;
-        
-        // 最大振幅の合計を更新（正規化のため）
         maxAmplitude += currentAmplitude;
-        
-        // 次のオクターブのために振幅と周波数を更新
         currentAmplitude *= m_persistence;
         currentFrequency *= m_lacunarity;
     }
 
-    // ノイズ値を正規化する (範囲を -1.0 から 1.0 に近づける)
-    // maxAmplitudeが0になることを防ぐ
     double normalizedNoise = (maxAmplitude > 0.0) ? (totalNoise / maxAmplitude) : 0.0;
     
-    // ノイズ結果を [0, 1] に正規化し、WORLD_MAX_HEIGHT にスケーリングして地形の高さを計算
-    int terrainHeight = static_cast<int>((normalizedNoise + 1.0) * 0.5 * m_worldMaxHeight);
+    // ノイズ結果を [0, WORLD_MAX_HEIGHT] の範囲にスケーリング
+    // ここではノイズを純粋な地形の隆起として扱い、最終的な高さは GROUND_LEVEL をベースにする
+    int terrainHeightOffset = static_cast<int>((normalizedNoise + 1.0) * 0.5 * (m_worldMaxHeight - m_groundLevel));
+    return m_groundLevel + terrainHeightOffset;
+}
 
-    // ボクセルがソリッドであるかどうかの判定
-    // ワールドY座標が地形の高さ以下であればソリッド
-    bool isSolid = (worldY < terrainHeight);
-    
-    // 地表レベルより下は常にソリッドにする、といった追加ルールも可能（コメントアウトされている例）
-    // 例: もし地面より下なら常にソリッドにしたい場合
-    // if (worldY < m_groundLevel) {
-    //     isSolid = true;
-    // } else {
-    //     isSolid = (worldY < terrainHeight);
-    // }
-
-    return isSolid;
+// 指定されたワールド座標のボクセルがソリッドであるかを判定
+// このメソッドは、TerrainGenerator::getTerrainHeight の結果を利用するように変更されます。
+// また、GROUND_LEVEL 以下の判定は ChunkManager 側で行うため、ここでは純粋に地形の高さに基づく判定のみを行う。
+bool TerrainGenerator::isVoxelSolid(float worldX, float worldY, float worldZ) const {
+    int terrainHeight = getTerrainHeight(worldX, worldZ);
+    return (worldY < terrainHeight);
+    // GROUND_LEVEL 以下の判定は ChunkManager::generateChunk で行われます
 }

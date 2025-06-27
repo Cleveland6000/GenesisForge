@@ -2,16 +2,23 @@
 #define TERRAIN_GENERATOR_HPP
 
 #include <memory>
-#include "noise/perlin_noise_2d.hpp" // PerlinNoise2D のために必要
+#include "noise/perlin_noise_2d.hpp"
 
 class TerrainGenerator {
 public:
-    // コンストラクタにオクターブ関連のパラメータを追加
     TerrainGenerator(unsigned int noiseSeed, float noiseScale, int worldMaxHeight, int groundLevel,
                      int octaves, float lacunarity, float persistence);
     
-    // 指定されたワールド座標のボクセルがソリッドであるかを判定
-    bool isVoxelSolid(float worldX, float worldY, float worldZ) const;
+    int getTerrainHeight(float worldX, float worldZ) const;
+
+    // isVoxelSolid はもはや外部から直接呼び出す必要がないかもしれませんが、
+    // 将来的な複雑なボクセルタイプ判定のために残しておくこともできます。
+    // 今回の最適化では、ChunkManagerがgetTerrainHeightの結果とgroundLevelを使って直接判定するため、
+    // このメソッドは使用されなくなります。
+    bool isVoxelSolid(float worldX, float worldY, float worldZ) const; 
+
+    // ChunkManager から groundLevel にアクセスするためのゲッター
+    int getGroundLevel() const { return m_groundLevel; }
 
 private:
     std::unique_ptr<PerlinNoise2D> m_perlinNoise;
@@ -19,10 +26,9 @@ private:
     int m_worldMaxHeight;
     int m_groundLevel;
 
-    // オクターブに関するパラメータ
-    int m_octaves;      // オクターブの数
-    float m_lacunarity; // 各オクターブの周波数が倍になる係数（通常2.0）
-    float m_persistence; // 各オクターブの振幅が減衰する係数（通常0.5）
+    int m_octaves;
+    float m_lacunarity;
+    float m_persistence;
 };
 
 #endif // TERRAIN_GENERATOR_HPP
