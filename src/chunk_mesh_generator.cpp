@@ -1,68 +1,54 @@
-// src/chunk_mesh_generator.cpp
 #include "chunk_mesh_generator.hpp"
 #include <glm/glm.hpp>
-#include <array> // std::array を使うため
-
-// 各面の頂点インデックスの定義
-// 注意: これは立方体の全体インデックスではなく、特定の面を構成するインデックスです。
-// 通常、OpenGLは右手座標系で、CCW（反時計回り）が前面と見なされます。
-// 面の定義順序は、見た目の法線が外側を向くように調整されています。
-
-// 各面ごとの頂点オフセットとインデックス
-// 1つの面は2つの三角形 (6つのインデックス) で構成されます。
-// Vertexデータは0.5を基準とした立方体座標
-// {x, y, z, r, g, b}
-
-// 各面のデータ構造を定義
-struct Face
-{
-    std::array<int, 6> indices; // 2つの三角形 (6インデックス)
-};
-
-// 各面に対応する頂点オフセット (基本立方体の頂点に対するオフセット)
-// 立方体は中心を(0,0,0)とし、各軸の範囲は-0.5から+0.5
-// 各面の法線方向に対応するチェックを行うための順序
-// 後ろ(Z-), 前(Z+), 下(Y-), 上(Y+), 左(X-), 右(X+)
+#include <array>
+#include <vector>
 
 // 立方体の基本頂点データ
+// 各面の「基本頂点」は、面の形を定義する最小限の4つの頂点と考える
 const std::vector<Vertex> baseCubeVertices = {
-    {-0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 0.0f}, // 0: Back-bottom-left (黒)
-    {0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f},  // 1: Back-bottom-right (赤)
-    {0.5f, 0.5f, -0.5f, 0.0f, 1.0f, 0.0f},   // 2: Back-top-right (緑)
-    {-0.5f, 0.5f, -0.5f, 0.0f, 0.0f, 1.0f},  // 3: Back-top-left (青)
-    {0.5f, 0.5f, 0.5f, 1.0f, 1.0f, 0.0f},    // 4: Front-top-right (黄)
-    {0.5f, -0.5f, 0.5f, 0.0f, 1.0f, 1.0f},   // 5: Front-bottom-right (シアン)
-    {-0.5f, -0.5f, 0.5f, 1.0f, 0.0f, 1.0f},  // 6: Front-bottom-left (マゼンタ)
-    {-0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f}    // 7: Front-top-left (グレー)
+    {-0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 0.0f}, // 0: Back-bottom-left (Z-)
+    {0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f},  // 1: Back-bottom-right (Z-)
+    {0.5f, 0.5f, -0.5f, 0.0f, 1.0f, 0.0f},   // 2: Back-top-right (Z-)
+    {-0.5f, 0.5f, -0.5f, 0.0f, 0.0f, 1.0f},  // 3: Back-top-left (Z-)
+    {0.5f, 0.5f, 0.5f, 1.0f, 1.0f, 0.0f},    // 4: Front-top-right (Z+)
+    {0.5f, -0.5f, 0.5f, 0.0f, 1.0f, 1.0f},   // 5: Front-bottom-right (Z+)
+    {-0.5f, -0.5f, 0.5f, 1.0f, 0.0f, 1.0f},  // 6: Front-bottom-left (Z+)
+    {-0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f}    // 7: Front-top-left (Z+)
 };
 
-// 各面ごとのインデックス（頂点データへの参照）
-// ここでは、各面がどの基本立方体頂点によって構成されるかを定義します。
-// 例: Back face は 0,1,2,3 の頂点を使用。
-// OpenGLの右手座標系とCCW（反時計回り）ルールに従い、法線が外側を向くようにインデックスを定義。
-const std::array<std::array<unsigned int, 6>, 6> cubeFaces = {
-    // Back face (Z- / 奥)
-    std::array<unsigned int, 6>{0, 3, 2, 0, 2, 1}, // 0: (-0.5,-0.5,-0.5), (-0.5,0.5,-0.5), (0.5,0.5,-0.5), (0.5,-0.5,-0.5)
+// 各面ごとの基本頂点インデックス（baseCubeVerticesへの参照）
+// 各面は4つのユニークな頂点インデックスから構成されます。
+// ここでの順序は、面を**外側から見たときに**、
+// CCW（反時計回り）になるように定義されています。
+// 具体的には、各面の最初の頂点（[0]）を基準とし、
+// それを起点に反時計回りに他の頂点を並べます。
+const std::array<std::array<unsigned int, 4>, 6> cubeFaceBaseIndices = {
+    // 0: Back face (Z-): 法線(0,0,-1)
+    // 外側から見てCCW: 0, 3, 2, 1 (左下、左上、右上、右下)
+    std::array<unsigned int, 4>{0, 3, 2, 1},
 
-    // Front face (Z+ / 手前)
-    std::array<unsigned int, 6>{6, 5, 4, 4, 7, 6}, // 元のコードのZ+インデックス
+    // 1: Front face (Z+): 法線(0,0,1)
+    // 外側から見てCCW: 6, 5, 4, 7 (左下、右下、右上、左上) -- ここを修正しました
+    std::array<unsigned int, 4>{6, 5, 4, 7},
 
-    // Left face (X- / 左)
-    std::array<unsigned int, 6>{0, 6, 3, 3, 6, 7}, // 2: (-0.5,-0.5,-0.5), (-0.5,-0.5,0.5), (-0.5,0.5,0.5), (-0.5,0.5,-0.5)
+    // 2: Left face (X-): 法線(-1,0,0)
+    // 外側から見てCCW: 0, 6, 7, 3 (左下、左上、右上、右下)
+    std::array<unsigned int, 4>{0, 6, 7, 3},
 
-    // Right face (X+ / 右)
-    std::array<unsigned int, 6>{1, 2, 4, 1, 4, 5}, // 3: (0.5,-0.5,-0.5), (0.5,0.5,-0.5), (0.5,0.5,0.5), (0.5,-0.5,0.5)
+    // 3: Right face (X+): 法線(1,0,0)
+    // 外側から見てCCW: 1, 2, 4, 5 (左下、左上、右上、右下)
+    std::array<unsigned int, 4>{1, 2, 4, 5},
 
-    // Bottom face (Y- / 下)
-    std::array<unsigned int, 6>{0, 1, 5, 0, 5, 6}, // 4: (-0.5,-0.5,-0.5), (0.5,-0.5,-0.5), (0.5,-0.5,0.5), (-0.5,-0.5,0.5)
+    // 4: Bottom face (Y-): 法線(0,-1,0)
+    // 外側から見てCCW: 0, 1, 5, 6 (左下、左上、右上、右下)
+    std::array<unsigned int, 4>{0, 1, 5, 6},
 
-    // Top face (Y+ / 上)
-    std::array<unsigned int, 6>{3, 7, 4, 3, 4, 2} // 5: (-0.5,0.5,-0.5), (-0.5,0.5,0.5), (0.5,0.5,0.5), (0.5,0.5,-0.5)
+    // 5: Top face (Y+): 法線(0,1,0)
+    // 外側から見てCCW: 3, 7, 4, 2 (左下、左上、右上、右下)
+    std::array<unsigned int, 4>{3, 7, 4, 2}
 };
 
 // 各面に対応する隣接ボクセルのオフセット (x, y, z)
-// この順序は cubeFaces と対応している必要があります！
-// 例: {0, 0, -1} は Z- 方向 (Back face) をチェック
 const std::array<glm::ivec3, 6> neighborOffsets = {
     glm::ivec3(0, 0, -1), // Back face (Z-)
     glm::ivec3(0, 0, 1),  // Front face (Z+)
@@ -77,7 +63,10 @@ ChunkMeshData ChunkMeshGenerator::generateMesh(const Chunk &chunk, float cubeSpa
     ChunkMeshData meshData;
     int chunkSize = chunk.getSize();
 
-    // チャンク内の各ボクセルを走査
+    // 最適化: 事前にベクタの容量を予約
+    meshData.vertices.reserve(chunkSize * chunkSize * chunkSize * 4 * 6);
+    meshData.indices.reserve(chunkSize * chunkSize * chunkSize * 6 * 6);
+
     for (int x = 0; x < chunkSize; ++x)
     {
         for (int y = 0; y < chunkSize; ++y)
@@ -86,7 +75,6 @@ ChunkMeshData ChunkMeshGenerator::generateMesh(const Chunk &chunk, float cubeSpa
             {
                 if (chunk.getVoxel(x, y, z))
                 { // 現在のボクセルが存在する場合
-                    // 現在のメッシュの頂点数（インデックスのオフセットに使う）
                     size_t currentVertexCount = meshData.vertices.size();
 
                     // 6つの各面についてチェック
@@ -97,30 +85,27 @@ ChunkMeshData ChunkMeshGenerator::generateMesh(const Chunk &chunk, float cubeSpa
                         int neighborY = y + offset.y;
                         int neighborZ = z + offset.z;
 
-                        // 隣接する位置にボクセルがあるか、またはチャンクの境界外であるかを確認
                         bool renderFace = true;
-                        // チャンク境界内の隣接ボクセルチェック
+                        // 隣接するボクセルがチャンク内にあるか、かつ不透明な場合、面は描画しない
                         if (neighborX >= 0 && neighborX < chunkSize &&
                             neighborY >= 0 && neighborY < chunkSize &&
                             neighborZ >= 0 && neighborZ < chunkSize)
                         {
                             if (chunk.getVoxel(neighborX, neighborY, neighborZ))
                             {
-                                renderFace = false; // 隣接するボクセルがあれば、この面は描画しない
+                                renderFace = false;
                             }
                         }
-                        // チャンクの境界外の場合は、常に面を描画する（空中に面が出ているため）
-                        // if (! (neighborX >= 0 && neighborX < chunkSize && ...)) の場合は renderFace = true のまま
-                        // つまり、このif文を抜けて renderFace が false になるのは、
-                        // 隣接するボクセルが「存在する」かつ「不透明」である場合のみ
 
                         if (renderFace)
                         {
                             // この面を描画する必要がある場合
-                            // 各立方体の頂点を計算し、メッシュデータに追加
-                            for (unsigned int baseIndex : cubeFaces[i])
+                            // 各面の4つの基本頂点を追加
+                            // cubeFaceBaseIndices[i] は、外側から見てCCWになるように並べられた4つの頂点のインデックス
+                            // V0 (0) V1 (1) V2 (2) V3 (3)
+                            for (unsigned int baseIdx : cubeFaceBaseIndices[i])
                             {
-                                Vertex baseVertex = baseCubeVertices[baseIndex];
+                                Vertex baseVertex = baseCubeVertices[baseIdx];
                                 Vertex newVertex = baseVertex;
                                 // ボクセル位置にオフセットを適用し、間隔を考慮
                                 newVertex.x += x * cubeSpacing;
@@ -129,16 +114,20 @@ ChunkMeshData ChunkMeshGenerator::generateMesh(const Chunk &chunk, float cubeSpa
                                 meshData.vertices.push_back(newVertex);
                             }
 
-                            // 各立方体のインデックスを計算し、メッシュデータに追加
-                            // ここでのインデックスは、新たに meshData.vertices に追加された頂点に対するもの
-                            for (int j = 0; j < 6; ++j)
-                            {
-                                // baseCubeIndices[j] を使う代わりに、
-                                // 各面のために新しく追加された6つの頂点に対して0から5のインデックスを直接参照する
-                                meshData.indices.push_back(static_cast<unsigned int>(currentVertexCount) + j);
-                            }
-                            // currentVertexCount は次の面（もし描画されるなら）のために更新する
-                            currentVertexCount = meshData.vertices.size();
+                            // 2つの三角形を形成する6つのインデックスを追加 (CCW順)
+                            // 追加された4つの頂点に対して、相対インデックスは 0, 1, 2, 3 となる
+                            // 三角形1: V0-V1-V2
+                            meshData.indices.push_back(static_cast<unsigned int>(currentVertexCount) + 0); // V0
+                            meshData.indices.push_back(static_cast<unsigned int>(currentVertexCount) + 1); // V1
+                            meshData.indices.push_back(static_cast<unsigned int>(currentVertexCount) + 2); // V2
+
+                            // 三角形2: V0-V2-V3
+                            meshData.indices.push_back(static_cast<unsigned int>(currentVertexCount) + 0); // V0
+                            meshData.indices.push_back(static_cast<unsigned int>(currentVertexCount) + 2); // V2
+                            meshData.indices.push_back(static_cast<unsigned int>(currentVertexCount) + 3); // V3
+
+                            // currentVertexCount は次の面のために更新
+                            currentVertexCount += 4;
                         }
                     }
                 }

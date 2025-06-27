@@ -146,17 +146,18 @@ bool Application::setupDependenciesAndLoadResources()
     }
     std::cout << "FontData unique_ptr created.\n";
 
-    // ChunkManager の初期化時に、地形生成関連のパラメータとオクターブ設定を渡す
+    // ChunkManager の初期化時に、X/ZとY軸両方の描画距離を渡す
     m_chunkManager = std::make_unique<ChunkManager>(
         CHUNK_GRID_SIZE, 
-        RENDER_DISTANCE_CHUNKS, 
+        RENDER_DISTANCE_CHUNKS,      // X/Z軸方向の描画距離
+        RENDER_DISTANCE_Y_CHUNKS,    // ★★★ Y軸方向の描画距離 ★★★
         WORLD_SEED, 
         NOISE_SCALE, 
         WORLD_MAX_HEIGHT, 
         GROUND_LEVEL,
-        TERRAIN_OCTAVES,       // オクターブ数
-        TERRAIN_LACUNARITY,    // ラキュナリティ
-        TERRAIN_PERSISTENCE    // パーシスタンス
+        TERRAIN_OCTAVES,       
+        TERRAIN_LACUNARITY,    
+        TERRAIN_PERSISTENCE    
     );
     if (!m_chunkManager)
     {
@@ -263,7 +264,7 @@ void Application::render()
             // この model 行列が、チャンクを正しいワールド位置に移動させる役割を果たす
             glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(
                 chunkCoord.x * CHUNK_GRID_SIZE,
-                chunkCoord.y * CHUNK_GRID_SIZE, // Y座標も考慮する場合
+                chunkCoord.y * CHUNK_GRID_SIZE, 
                 chunkCoord.z * CHUNK_GRID_SIZE
             ));
             

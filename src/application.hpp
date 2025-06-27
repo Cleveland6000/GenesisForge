@@ -44,9 +44,10 @@ private:
     std::string m_fpsString;
     std::string m_positionString;
 
-    static constexpr int CHUNK_GRID_SIZE = 48;     // チャンクのサイズ
+    static constexpr int CHUNK_GRID_SIZE = 16;     // チャンクのサイズ
     static constexpr float NOISE_SCALE = 0.006f;    // パーリンノイズの全体的なスケール（細かさ）
-    static constexpr int RENDER_DISTANCE_CHUNKS = 6; // プレイヤーからのチャンクの描画距離（チャンク単位）
+    static constexpr int RENDER_DISTANCE_CHUNKS = 2; // プレイヤーからのチャンクの描画距離（X/Z軸チャンク単位）
+    static constexpr int RENDER_DISTANCE_Y_CHUNKS = 2; // ★★★ 新しく追加：プレイヤーからのチャンクの描画距離（Y軸チャンク単位） ★★★
     static constexpr unsigned int WORLD_SEED = 12345; // ワールド生成のための固定シード
 
     static constexpr int WORLD_MAX_HEIGHT = 48;    // ワールド全体のボクセルの最大高さ
