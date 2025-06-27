@@ -1,4 +1,4 @@
-#include "./PerlinNoise2D.hpp"
+#include "./perlin_noise_2d.hpp"
 #include <iostream>
 #include <numeric>
 #include <random>

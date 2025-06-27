@@ -6,7 +6,7 @@
 #include <iostream>
 #include <iomanip>
 #include <sstream>
-#include "noise/PerlinNoise2D.hpp"
+#include "noise/perlin_noise_2d.hpp"
 #include <chrono>
 
 const float Application::CLEAR_COLOR_R = 0.0f, Application::CLEAR_COLOR_G = 0.0f, Application::CLEAR_COLOR_B = 0.0f, Application::CLEAR_COLOR_A = 1.0f;
