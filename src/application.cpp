@@ -1,6 +1,6 @@
 // src/application.cpp
 
-#include <glad/glad.h>   // これを一番最初に置く
+#include <glad/glad.h>
 
 #include "application.hpp"
 #include <iostream>
@@ -9,9 +9,12 @@
 #include "noise/perlin_noise_2d.hpp"
 #include <chrono>
 
+#include "chunk_mesh_generator.hpp" 
+#include "chunk_renderer.hpp"     
+
 const float Application::CLEAR_COLOR_R = 0.0f, Application::CLEAR_COLOR_G = 0.0f, Application::CLEAR_COLOR_B = 0.0f, Application::CLEAR_COLOR_A = 1.0f;
 
-Application::Application(std::unique_ptr<WindowContext> windowContext, // WindowContextを受け取る
+Application::Application(std::unique_ptr<WindowContext> windowContext,
                          std::unique_ptr<Camera> camera,
                          std::unique_ptr<Timer> timer,
                          std::unique_ptr<InputManager> inputManager,
@@ -20,7 +23,7 @@ Application::Application(std::unique_ptr<WindowContext> windowContext, // Window
                          std::unique_ptr<Renderer> renderer,
                          std::unique_ptr<FontData> fontData,
                          std::unique_ptr<FontLoader> fontLoader)
-    : m_windowContext(std::move(windowContext)), // WindowContextをムーブ
+    : m_windowContext(std::move(windowContext)),
       m_camera(std::move(camera)),
       m_timer(std::move(timer)),
       m_inputManager(std::move(inputManager)),
@@ -28,7 +31,8 @@ Application::Application(std::unique_ptr<WindowContext> windowContext, // Window
       m_fontData(std::move(fontData)),
       m_chunk(std::move(chunk)),
       m_renderer(std::move(renderer)),
-      m_fontLoader(std::move(fontLoader))
+      m_fontLoader(std::move(fontLoader)),
+      m_testCubeRenderData() 
 {
 }
 
@@ -38,14 +42,8 @@ Application::~Application() {
 
 bool Application::initialize()
 {
-    // ★GLFW関連の初期化はWindowContextで行われるので削除★
-    // if (!initGLFW()) { /* error */ }
-    // if (!createWindowAndContext()) { /* error */ }
-
-    // WindowContextにコールバックを登録する
     setupCallbacks();
 
-    // ここでFontDataをロードする（OpenGLコンテキストは既に作成されているはず）
     if (!m_fontLoader || !m_fontData) {
         std::cerr << "Error: FontLoader or FontData is null in Application::initialize.\n";
         return false;
@@ -68,16 +66,25 @@ bool Application::initialize()
         std::cerr << "Failed to initialize Renderer.\n";
         return false;
     }
+
+    // !!!ここが変更点!!! ChunkMeshGenerator::generateCubeMesh() の代わりに
+    // ChunkMeshGenerator::generateMesh() を呼び出す
+    ChunkMeshData chunkMeshData = ChunkMeshGenerator::generateMesh(*m_chunk, m_cubeSpacing);
+    m_testCubeRenderData = ChunkRenderer::createChunkRenderData(chunkMeshData); 
+
+    int initialWidth, initialHeight;
+    glfwGetFramebufferSize(m_windowContext->getWindow(), &initialWidth, &initialHeight);
+    updateProjectionMatrix(initialWidth, initialHeight);
+
+
     std::cout << "Application initialized successfully.\n";
     return true;
 }
 
 void Application::setupCallbacks()
 {
-    // WindowContextのコールバックセッターを利用して登録
     m_windowContext->setFramebufferSizeCallback([this](int w, int h) {
         this->updateProjectionMatrix(w, h);
-        glViewport(0, 0, w, h); // glViewportの更新はWindowContextのコールバックラッパーで行われるため、ここからは削除
     });
 
     m_windowContext->setCursorPosCallback([this](double xpos, double ypos) {
@@ -87,36 +94,31 @@ void Application::setupCallbacks()
     });
 }
 
-// FontLoader関連の処理は既にApplication::initialize()に移動済み
 bool Application::initializeManagersAndLoadResources()
 {
-    // nullチェックを追加 (DIで渡されなかった場合を考慮)
     if (!m_inputManager || !m_fullscreenManager || !m_chunk)
     {
         std::cerr << "One or more managers/resources not provided via DI.\n";
         return false;
     }
 
-
+    // Perlin Noise によるチャンクのボクセル設定ロジックはそのまま
     unsigned int seed = static_cast<unsigned int>(std::chrono::system_clock::now().time_since_epoch().count());
     PerlinNoise2D perlin(seed);
     float scale = 0.05f;
-    int m_size = m_chunk->getSize();
+    int m_size = m_chunk->getSize(); // Chunkのサイズを取得
     for (int x = 0; x < m_size; ++x)
     {
         for (int y = 0; y < m_size; ++y)
         {
             for (int z = 0; z < m_size; ++z)
             {
+                // ここでボクセルデータが設定される
                 m_chunk->setVoxel(x, y, z, (perlin.noise(x * scale, z * scale) * 6) + 5 >= y);
             }
         }
     }
 
-
-
-
-    // InputManager にウィンドウポインタを設定 (WindowContextから取得)
     m_inputManager->setWindow(m_windowContext->getWindow());
 
     m_fullscreenManager->setWindowSizeChangeCallback([this](int w, int h)
@@ -126,7 +128,6 @@ bool Application::initializeManagersAndLoadResources()
         if (this->m_inputManager) {
             this->m_inputManager->resetMouseState();
         } });
-    // FullscreenManagerのtoggleFullscreenにはGLFWwindow*が必要
     m_fullscreenManager->toggleFullscreen(m_windowContext->getWindow());
 
     return true;
@@ -134,24 +135,23 @@ bool Application::initializeManagersAndLoadResources()
 
 void Application::run()
 {
-    while (!m_windowContext->shouldClose()) // WindowContext経由でクローズ状態を確認
+    while (!m_windowContext->shouldClose())
     {
         processInput();
         update();
         render();
-        m_windowContext->swapBuffers(); // WindowContext経由でバッファスワップ
-        m_windowContext->pollEvents();  // WindowContext経由でイベントポーリング
+        m_windowContext->swapBuffers();
+        m_windowContext->pollEvents();
     }
 }
 
 void Application::processInput()
 {
     static bool f11_last = false;
-    // WindowContextからウィンドウポインタを取得
     if (glfwGetKey(m_windowContext->getWindow(), GLFW_KEY_F11) == GLFW_PRESS)
     {
         if (!f11_last)
-            m_fullscreenManager->toggleFullscreen(m_windowContext->getWindow()); // WindowContextからウィンドウポインタを取得
+            m_fullscreenManager->toggleFullscreen(m_windowContext->getWindow());
         f11_last = true;
     }
     else
@@ -161,12 +161,11 @@ void Application::processInput()
         m_inputManager->processInput();
 
     auto key = [this](int k)
-    { return glfwGetKey(m_windowContext->getWindow(), k) == GLFW_PRESS; }; // WindowContextからウィンドウポインタを取得
+    { return glfwGetKey(m_windowContext->getWindow(), k) == GLFW_PRESS; };
     m_camera->processMovementVector(key(GLFW_KEY_W), key(GLFW_KEY_S), key(GLFW_KEY_A), key(GLFW_KEY_D), m_timer->getDeltaTime());
     m_camera->processVerticalMovement(key(GLFW_KEY_SPACE), key(GLFW_KEY_LEFT_CONTROL), m_timer->getDeltaTime());
 }
 
-// update(), updateFpsAndPositionStrings(), render() は WindowContext に直接依存しないので変更なし
 void Application::update()
 {
     m_timer->tick();
@@ -200,9 +199,11 @@ void Application::render()
     }
     m_renderer->beginFrame(glm::vec4(CLEAR_COLOR_R, CLEAR_COLOR_G, CLEAR_COLOR_B, CLEAR_COLOR_A));
     glm::mat4 view = m_camera->getViewMatrix();
-    m_renderer->renderScene(m_projectionMatrix, view, *m_chunk, m_cubeSpacing);
+    
+    // Chunk全体のレンダリングデータを渡す
+    m_renderer->renderScene(m_projectionMatrix, view, m_testCubeRenderData); 
+
     int w, h;
-    // WindowContextから現在のウィンドウサイズを取得
     glfwGetFramebufferSize(m_windowContext->getWindow(), &w, &h);
     m_renderer->renderOverlay(w, h, m_fpsString, m_positionString);
     m_renderer->endFrame();
