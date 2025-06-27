@@ -146,14 +146,14 @@ bool Application::setupDependenciesAndLoadResources()
     }
     std::cout << "FontData unique_ptr created.\n";
 
-    // ChunkManager の初期化時に WORLD_SEED を渡す
-    m_chunkManager = std::make_unique<ChunkManager>(CHUNK_GRID_SIZE, NOISE_SCALE, RENDER_DISTANCE_CHUNKS, WORLD_SEED);
+    // ChunkManager の初期化時に WORLD_SEED, WORLD_MAX_HEIGHT, GROUND_LEVEL を渡す
+    m_chunkManager = std::make_unique<ChunkManager>(CHUNK_GRID_SIZE, NOISE_SCALE, RENDER_DISTANCE_CHUNKS, WORLD_SEED, WORLD_MAX_HEIGHT, GROUND_LEVEL);
     if (!m_chunkManager)
     {
         std::cerr << "Application: Failed to create ChunkManager.\n";
         return false;
     }
-    std::cout << "ChunkManager created with WORLD_SEED.\n";
+    std::cout << "ChunkManager created with WORLD_SEED, WORLD_MAX_HEIGHT, GROUND_LEVEL.\n";
 
     m_renderer = std::make_unique<Renderer>();
     if (!m_renderer)

@@ -5,9 +5,9 @@
 #include <unordered_map>
 #include <glm/glm.hpp>
 #include "chunk/chunk.hpp"
-#include "chunk_mesh_generator.hpp" // ChunkMeshData, ChunkRenderData のために必要
-#include "chunk_renderer.hpp"     // ChunkMeshData, ChunkRenderData のために必要
-#include "noise/perlin_noise_2d.hpp" // PerlinNoise2D のために必要
+#include "chunk_mesh_generator.hpp"
+#include "chunk_renderer.hpp"
+#include "noise/perlin_noise_2d.hpp"
 
 // チャンクのワールド座標をキーとするハッシュ関数
 struct Vec3iHash {
@@ -18,20 +18,13 @@ struct Vec3iHash {
 
 class ChunkManager {
 public:
-    // コンストラクタにノイズシードを追加
-    ChunkManager(int chunkSize, float noiseScale, int renderDistance, unsigned int noiseSeed);
+    // コンストラクタにノイズシード、ワールドの高さパラメータを追加
+    ChunkManager(int chunkSize, float noiseScale, int renderDistance, unsigned int noiseSeed, int worldMaxHeight, int groundLevel);
     ~ChunkManager();
 
-    // プレイヤーの位置に基づいてチャンクを更新（ロード/アンロード）
     void update(const glm::vec3& playerPosition);
-
-    // 指定されたワールド座標のチャンクが存在するかどうかをチェック
     bool hasChunk(const glm::ivec3& chunkCoord) const;
-
-    // 指定されたチャンク座標のチャンクを取得
     std::shared_ptr<Chunk> getChunk(const glm::ivec3& chunkCoord);
-
-    // レンダリングのためのすべてのチャンクのChunkRenderDataを取得
     const std::unordered_map<glm::ivec3, ChunkRenderData, Vec3iHash>& getAllRenderData() const {
         return m_chunkRenderData;
     }
@@ -39,27 +32,19 @@ public:
 private:
     int m_chunkSize;
     float m_noiseScale;
-    int m_renderDistance; // プレイヤーからどれくらいの距離までチャンクをロードするか
-    
-    std::unique_ptr<PerlinNoise2D> m_perlinNoise; // PerlinNoise2D のインスタンスをメンバとして保持
+    int m_renderDistance;
+    int m_worldMaxHeight; // ワールド全体の最大高さ
+    int m_groundLevel;    // 地表の基準となる高さ
 
-    // キーはチャンクのワールド座標（例: (0,0,0), (1,0,0) など、チャンクごとの原点）
+    std::unique_ptr<PerlinNoise2D> m_perlinNoise;
+
     std::unordered_map<glm::ivec3, std::shared_ptr<Chunk>, Vec3iHash> m_chunks;
     std::unordered_map<glm::ivec3, ChunkRenderData, Vec3iHash> m_chunkRenderData;
 
-    // チャンクを生成して初期化
     std::shared_ptr<Chunk> generateChunk(const glm::ivec3& chunkCoord);
-
-    // チャンクのメッシュを生成し、レンダリングデータを更新
     void updateChunkMesh(const glm::ivec3& chunkCoord, std::shared_ptr<Chunk> chunk);
-
-    // 指定された座標範囲内のチャンクをロード
     void loadChunksInArea(const glm::ivec3& centerChunkCoord);
-
-    // 不要なチャンクをアンロード
     void unloadDistantChunks(const glm::ivec3& centerChunkCoord);
-
-    // ワールド座標からチャンク座標を計算
     glm::ivec3 getChunkCoordFromWorldPos(const glm::vec3& worldPos) const;
 };
 
