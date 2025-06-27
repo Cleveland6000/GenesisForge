@@ -1,47 +1,36 @@
-// src/application.cpp
-
 #include <glad/glad.h>
-
 #include "application.hpp"
 #include <iostream>
 #include <iomanip>
 #include <sstream>
-#include "noise/perlin_noise_2d.hpp"
 #include <chrono>
 
-#include "chunk_mesh_generator.hpp" 
-#include "chunk_renderer.hpp"     
+#include "noise/perlin_noise_2d.hpp"
+#include "chunk_mesh_generator.hpp"
+#include "chunk_renderer.hpp"
+
+#define SCR_WIDTH 800
+#define SCR_HEIGHT 600
 
 const float Application::CLEAR_COLOR_R = 0.0f, Application::CLEAR_COLOR_G = 0.0f, Application::CLEAR_COLOR_B = 0.0f, Application::CLEAR_COLOR_A = 1.0f;
 
-Application::Application(std::unique_ptr<WindowContext> windowContext,
-                         std::unique_ptr<Camera> camera,
-                         std::unique_ptr<Timer> timer,
-                         std::unique_ptr<InputManager> inputManager,
-                         std::unique_ptr<FullscreenManager> fullscreenManager,
-                         std::unique_ptr<Chunk> chunk,
-                         std::unique_ptr<Renderer> renderer,
-                         std::unique_ptr<FontData> fontData,
-                         std::unique_ptr<FontLoader> fontLoader)
-    : m_windowContext(std::move(windowContext)),
-      m_camera(std::move(camera)),
-      m_timer(std::move(timer)),
-      m_inputManager(std::move(inputManager)),
-      m_fullscreenManager(std::move(fullscreenManager)),
-      m_fontData(std::move(fontData)),
-      m_chunk(std::move(chunk)),
-      m_renderer(std::move(renderer)),
-      m_fontLoader(std::move(fontLoader)),
-      m_testCubeRenderData() 
+Application::Application()
 {
+    std::cout << "--- Application constructor called. ---\n";
 }
 
 Application::~Application() {
-    // GLFWの終了はWindowContextのデストラクタやmain関数で適切に処理される
+    std::cout << "--- Application destructor called. ---\n";
+    glfwTerminate();
 }
 
 bool Application::initialize()
 {
+    if (!setupDependenciesAndLoadResources()) {
+        std::cerr << "Application: Failed to setup dependencies and load resources. Exiting.\n";
+        return false;
+    }
+
     setupCallbacks();
 
     if (!m_fontLoader || !m_fontData) {
@@ -55,30 +44,33 @@ bool Application::initialize()
     }
     std::cout << "FontData loaded by Application.\n";
 
-    if (!initializeManagersAndLoadResources())
-    {
-        std::cerr << "Initialize managers failed.\n";
-        return false;
-    }
-
     if (m_renderer && !m_renderer->initialize(*m_fontData))
     {
         std::cerr << "Failed to initialize Renderer.\n";
         return false;
     }
 
-    // !!!ここが変更点!!! ChunkMeshGenerator::generateCubeMesh() の代わりに
-    // ChunkMeshGenerator::generateMesh() を呼び出す
     ChunkMeshData chunkMeshData = ChunkMeshGenerator::generateMesh(*m_chunk, m_cubeSpacing);
-    m_testCubeRenderData = ChunkRenderer::createChunkRenderData(chunkMeshData); 
+    m_testCubeRenderData = ChunkRenderer::createChunkRenderData(chunkMeshData);
 
     int initialWidth, initialHeight;
     glfwGetFramebufferSize(m_windowContext->getWindow(), &initialWidth, &initialHeight);
     updateProjectionMatrix(initialWidth, initialHeight);
 
-
     std::cout << "Application initialized successfully.\n";
     return true;
+}
+
+void Application::run()
+{
+    while (!m_windowContext->shouldClose())
+    {
+        processInput();
+        update();
+        render();
+        m_windowContext->swapBuffers();
+        m_windowContext->pollEvents();
+    }
 }
 
 void Application::setupCallbacks()
@@ -94,55 +86,73 @@ void Application::setupCallbacks()
     });
 }
 
-bool Application::initializeManagersAndLoadResources()
+bool Application::setupDependenciesAndLoadResources()
 {
-    if (!m_inputManager || !m_fullscreenManager || !m_chunk)
+    std::cout << "Application::setupDependenciesAndLoadResources started.\n";
+
+    m_windowContext = std::make_unique<WindowContext>("Hello OpenGL Cubes", SCR_WIDTH, SCR_HEIGHT);
+    if (!m_windowContext || !m_windowContext->initialize())
     {
-        std::cerr << "One or more managers/resources not provided via DI.\n";
+        std::cerr << "Application: Failed to create or initialize WindowContext.\n";
         return false;
     }
+    std::cout << "WindowContext created and initialized.\n";
 
-    // Perlin Noise によるチャンクのボクセル設定ロジックはそのまま
+    m_camera = std::make_unique<Camera>(glm::vec3(0.0f));
+    if (!m_camera) { std::cerr << "Application: Failed to create Camera.\n"; return false; }
+    std::cout << "Camera created.\n";
+
+    m_timer = std::make_unique<Timer>();
+    if (!m_timer) { std::cerr << "Application: Failed to create Timer.\n"; return false; }
+    std::cout << "Timer created.\n";
+
+    m_inputManager = std::make_unique<InputManager>(*m_camera);
+    if (!m_inputManager) { std::cerr << "Application: Failed to create InputManager.\n"; return false; }
+    std::cout << "InputManager created.\n";
+
+    m_fullscreenManager = std::make_unique<FullscreenManager>();
+    if (!m_fullscreenManager) { std::cerr << "Application: Failed to create FullscreenManager.\n"; return false; }
+    std::cout << "FullscreenManager created.\n";
+
+    m_fontLoader = std::make_unique<FontLoader>();
+    if (!m_fontLoader) { std::cerr << "Application: Failed to create FontLoader.\n"; return false; }
+    std::cout << "FontLoader created.\n";
+
+    m_fontData = std::make_unique<FontData>();
+    if (!m_fontData) { std::cerr << "Application: Failed to create FontData unique_ptr.\n"; return false; }
+    std::cout << "FontData unique_ptr created.\n";
+
+    m_chunk = std::make_unique<Chunk>(CHUNK_GRID_SIZE);
+    if (!m_chunk) { std::cerr << "Application: Failed to create Chunk.\n"; return false; }
+    std::cout << "Chunk created.\n";
+
+    m_renderer = std::make_unique<Renderer>();
+    if (!m_renderer) { std::cerr << "Application: Failed to create Renderer.\n"; return false; }
+    std::cout << "Renderer created.\n";
+
     unsigned int seed = static_cast<unsigned int>(std::chrono::system_clock::now().time_since_epoch().count());
     PerlinNoise2D perlin(seed);
     float scale = 0.05f;
-    int m_size = m_chunk->getSize(); // Chunkのサイズを取得
-    for (int x = 0; x < m_size; ++x)
-    {
-        for (int y = 0; y < m_size; ++y)
-        {
-            for (int z = 0; z < m_size; ++z)
-            {
-                // ここでボクセルデータが設定される
+    int m_size = m_chunk->getSize();
+    for (int x = 0; x < m_size; ++x) {
+        for (int y = 0; y < m_size; ++y) {
+            for (int z = 0; z < m_size; ++z) {
                 m_chunk->setVoxel(x, y, z, (perlin.noise(x * scale, z * scale) * 6) + 5 >= y);
             }
         }
     }
 
     m_inputManager->setWindow(m_windowContext->getWindow());
-
-    m_fullscreenManager->setWindowSizeChangeCallback([this](int w, int h)
-                                                      { this->updateProjectionMatrix(w, h); });
-    m_fullscreenManager->setMouseResetCallback([this]()
-                                                {
+    m_fullscreenManager->setWindowSizeChangeCallback([this](int w, int h) { this->updateProjectionMatrix(w, h); });
+    m_fullscreenManager->setMouseResetCallback([this]() {
         if (this->m_inputManager) {
             this->m_inputManager->resetMouseState();
-        } });
+        }
+    });
     m_fullscreenManager->toggleFullscreen(m_windowContext->getWindow());
 
+    std::cout << "Application::setupDependenciesAndLoadResources finished successfully.\n";
     return true;
-}
-
-void Application::run()
-{
-    while (!m_windowContext->shouldClose())
-    {
-        processInput();
-        update();
-        render();
-        m_windowContext->swapBuffers();
-        m_windowContext->pollEvents();
-    }
 }
 
 void Application::processInput()
@@ -199,9 +209,7 @@ void Application::render()
     }
     m_renderer->beginFrame(glm::vec4(CLEAR_COLOR_R, CLEAR_COLOR_G, CLEAR_COLOR_B, CLEAR_COLOR_A));
     glm::mat4 view = m_camera->getViewMatrix();
-    
-    // Chunk全体のレンダリングデータを渡す
-    m_renderer->renderScene(m_projectionMatrix, view, m_testCubeRenderData); 
+    m_renderer->renderScene(m_projectionMatrix, view, m_testCubeRenderData);
 
     int w, h;
     glfwGetFramebufferSize(m_windowContext->getWindow(), &w, &h);
