@@ -13,6 +13,15 @@ file(GLOB_RECURSE SOURCES "${CMAKE_SOURCE_DIR}/src/*.cpp" "${CMAKE_SOURCE_DIR}/s
 add_executable(${PROJECT_NAME} ${SOURCES})
 add_compile_definitions(GLFW_INCLUDE_NONE)
 
+# Windows環境の場合のみリソースファイルをリンク
+if(WIN32)
+    # 実行可能ファイルにリソースファイルを追加
+    # resource.rc が src ディレクトリにあることを前提としています
+    target_sources(${PROJECT_NAME} PRIVATE
+        "${CMAKE_SOURCE_DIR}/src/resource.rc"
+    )
+endif()
+
 target_include_directories(${PROJECT_NAME} PUBLIC
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/dependencies/include

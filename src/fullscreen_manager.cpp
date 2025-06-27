@@ -4,7 +4,7 @@
 // 以前のコメントにあったように、Applicationクラスをインクルードする必要はありません。
 
 FullscreenManager::FullscreenManager()
-    : m_isFullscreen(false),
+    : m_isFullscreen(true),
       m_windowedPosX(0), // m_windowedX を m_windowedPosX に修正
       m_windowedPosY(0), // m_windowedY を m_windowedPosY に修正
       m_windowedWidth(0),

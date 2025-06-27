@@ -1,0 +1,9 @@
+#define APSTUDIO_READONLY_SYMBOLS
+#include "afxres.h" // 必要であれば、MFCなどのリソースヘッダーをインクルード
+#undef APSTUDIO_READONLY_SYMBOLS
+
+// メインアイコン
+IDI_ICON1 ICON "../assets/icon/favicon.ico" // ここをあなたのアイコンファイルへのパスに書き換える
+
+// 既存のアイコンを使用する場合（例：システムアイコンなど）
+// IDI_APPLICATION ICON "res/application.ico"
