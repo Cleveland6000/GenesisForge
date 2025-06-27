@@ -1,16 +1,30 @@
-// src/chunk_renderer.hpp
 #ifndef CHUNK_RENDERER_HPP
 #define CHUNK_RENDERER_HPP
 
 #include <glad/glad.h>
-#include "renderer.hpp" // ChunkRenderData の定義を含む
-#include "chunk_mesh_generator.hpp" // ChunkMeshData の定義を含む
+#include <vector>
+#include <glm/glm.hpp>
+#include "chunk_mesh_generator.hpp" // ChunkMeshDataの定義用
+
+// ChunkRenderData構造体は、OpenGL描画に必要な情報を保持します。
+// VAO, VBO, EBO (またはIBO) および描画するインデックスの数を含みます。
+struct ChunkRenderData {
+    GLuint VAO = 0;
+    GLuint VBO = 0;
+    GLuint EBO = 0; // Element Buffer Object (Index Buffer Object)
+    GLsizei indexCount = 0; // 描画するインデックスの数
+};
 
 class ChunkRenderer {
 public:
-    // ChunkMeshData から OpenGL 用の ChunkRenderData を生成する
-    // この関数はGPUリソースを作成します
+    // ChunkMeshDataからOpenGLレンダリングデータを生成します。
+    // この関数はVAO、VBO、EBOを作成し、データをGPUにアップロードします。
     static ChunkRenderData createChunkRenderData(const ChunkMeshData& meshData);
+
+    // ChunkRenderDataに関連付けられたOpenGLリソースを解放します。
+    // VAO、VBO、EBOを削除します。
+    static void deleteChunkRenderData(ChunkRenderData& renderData);
 };
 
 #endif // CHUNK_RENDERER_HPP
+
