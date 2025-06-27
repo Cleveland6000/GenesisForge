@@ -59,9 +59,6 @@ std::shared_ptr<Chunk> ChunkManager::generateChunk(const glm::ivec3& chunkCoord)
     std::cout << "Generating chunk at: (" << chunkCoord.x << ", " << chunkCoord.y << ", " << chunkCoord.z << ")\n";
     std::shared_ptr<Chunk> newChunk = std::make_shared<Chunk>(m_chunkSize);
 
-    // ChunkManager の m_perlinNoise メンバを使用
-    // PerlinNoise2D perlin(seed); // この行は削除
-    
     if (!m_perlinNoise) {
         std::cerr << "Error: PerlinNoise2D instance is not initialized in ChunkManager.\n";
         return newChunk; // エラー処理、または適切に初期化されていることを保証
