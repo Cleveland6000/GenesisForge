@@ -150,7 +150,6 @@ bool Application::setupDependenciesAndLoadResources()
     m_chunkManager = std::make_unique<ChunkManager>(
         CHUNK_GRID_SIZE, 
         RENDER_DISTANCE_CHUNKS,      // X/Z軸方向の描画距離
-        RENDER_DISTANCE_Y_CHUNKS,    // ★★★ Y軸方向の描画距離 ★★★
         WORLD_SEED, 
         NOISE_SCALE, 
         WORLD_MAX_HEIGHT, 
