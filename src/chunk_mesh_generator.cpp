@@ -6,14 +6,14 @@
 // 立方体の基本頂点データ
 // 各面の「基本頂点」は、面の形を定義する最小限の4つの頂点と考える
 const std::vector<Vertex> baseCubeVertices = {
-    {-0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 0.0f}, // 0: Back-bottom-left (Z-)
-    {0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f},  // 1: Back-bottom-right (Z-)
-    {0.5f, 0.5f, -0.5f, 0.0f, 1.0f, 0.0f},   // 2: Back-top-right (Z-)
-    {-0.5f, 0.5f, -0.5f, 0.0f, 0.0f, 1.0f},  // 3: Back-top-left (Z-)
-    {0.5f, 0.5f, 0.5f, 1.0f, 1.0f, 0.0f},    // 4: Front-top-right (Z+)
-    {0.5f, -0.5f, 0.5f, 0.0f, 1.0f, 1.0f},   // 5: Front-bottom-right (Z+)
-    {-0.5f, -0.5f, 0.5f, 1.0f, 0.0f, 1.0f},  // 6: Front-bottom-left (Z+)
-    {-0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f}    // 7: Front-top-left (Z+)
+    {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}, // 0: Back-bottom-left (Z-)
+    {1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f},  // 1: Back-bottom-right (Z-)
+    {1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f},   // 2: Back-top-right (Z-)
+    {0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f},  // 3: Back-top-left (Z-)
+    {1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f},    // 4: Front-top-right (Z+)
+    {1.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f},   // 5: Front-bottom-right (Z+)
+    {0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f},  // 6: Front-bottom-left (Z+)
+    {0.0f, 1.0f, 1.0f, 0.5f, 0.5f, 0.5f}    // 7: Front-top-left (Z+)
 };
 
 // 各面ごとの基本頂点インデックス（baseCubeVerticesへの参照）
