@@ -121,7 +121,7 @@ void Renderer::renderOverlay(int screenWidth, int screenHeight, const std::strin
 {
     glm::mat4 orthoProjection = glm::ortho(0.0f, (float)screenWidth, 0.0f, (float)screenHeight);
 
-    const float RELATIVE_TEXT_HEIGHT_RATIO = 1.0f / 15.0f;
+    const float RELATIVE_TEXT_HEIGHT_RATIO = 1.0f / 20.0f;
     float targetTextHeightPx = screenHeight * RELATIVE_TEXT_HEIGHT_RATIO;
 
     float textScale = m_fontData.baseFontSize > 0 ? targetTextHeightPx / (float)m_fontData.baseFontSize : 1.0f;

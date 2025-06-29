@@ -36,9 +36,9 @@ private:
     // Constants for window size and clear color
     static constexpr int INITIAL_SCR_WIDTH = 800;  // 新しい定数
     static constexpr int INITIAL_SCR_HEIGHT = 600; // 新しい定数
-    static constexpr float CLEAR_COLOR_R = 0.0f;
-    static constexpr float CLEAR_COLOR_G = 0.0f;
-    static constexpr float CLEAR_COLOR_B = 0.0f;
+    static constexpr float CLEAR_COLOR_R = 148.0f / 255.0f;
+    static constexpr float CLEAR_COLOR_G = 197.0f / 255.0f;
+    static constexpr float CLEAR_COLOR_B = 255.0f / 255.0f;
     static constexpr float CLEAR_COLOR_A = 1.0f;
 
     // Unique pointers for managing resources

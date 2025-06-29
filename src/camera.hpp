@@ -10,7 +10,7 @@ enum Camera_Movement
     RIGHT
 };
 
-const float YAW = -90.0f, PITCH = 0.0f, SPEED = 4.5f, SENSITIVITY = 0.05f, ZOOM = 60.0f;
+const float YAW = -90.0f, PITCH = 0.0f, SPEED = 5.5f, SENSITIVITY = 0.05f, ZOOM = 60.0f;
 
 class Camera
 {
