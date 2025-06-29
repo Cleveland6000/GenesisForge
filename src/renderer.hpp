@@ -5,15 +5,12 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <memory>
+#include <string> // std::string を使うために追加
 #include <vector>
 #include "FontLoader.hpp"
 #include "TextRenderer.hpp"
-// #include "chunk/chunk.hpp" // ChunkRenderDataがChunkに依存しないため、通常は不要です。
 #include "opengl_utils.hpp"
-// #include "chunk_mesh_generator.hpp" // ChunkRenderDataが生成に直接関与しないため、通常は不要です。
 
-// ChunkRenderData は純粋なOpenGLバッファ情報とインデックス数のみを保持するように変更
-// modelMatrix はレンダリング時にApplication側から渡す
 struct ChunkRenderData {
     GLuint VAO = 0;
     GLuint VBO = 0;
@@ -26,12 +23,8 @@ struct ChunkRenderData {
         if (VBO != 0) glDeleteBuffers(1, &VBO);
         if (EBO != 0) glDeleteBuffers(1, &EBO);
     }
-    // コピーコンストラクタと代入演算子は削除
-    // OpenGLリソースはユニークであるべきで、コピーされるべきではありません
     ChunkRenderData(const ChunkRenderData&) = delete;
     ChunkRenderData& operator=(const ChunkRenderData&) = delete;
-
-    // ムーブコンストラクタとムーブ代入演算子は維持（リソースの所有権移転のため）
     ChunkRenderData(ChunkRenderData&& other) noexcept
         : VAO(other.VAO), VBO(other.VBO), EBO(other.EBO), indexCount(other.indexCount) {
         other.VAO = 0;
@@ -41,18 +34,13 @@ struct ChunkRenderData {
     }
     ChunkRenderData& operator=(ChunkRenderData&& other) noexcept {
         if (this != &other) {
-            // 既存のリソースを解放
             if (VAO != 0) glDeleteVertexArrays(1, &VAO);
             if (VBO != 0) glDeleteBuffers(1, &VBO);
             if (EBO != 0) glDeleteBuffers(1, &EBO);
-
-            // 所有権を移転
             VAO = other.VAO;
             VBO = other.VBO;
             EBO = other.EBO;
             indexCount = other.indexCount;
-
-            // 'other' を無効化
             other.VAO = 0;
             other.VBO = 0;
             other.EBO = 0;
@@ -62,8 +50,7 @@ struct ChunkRenderData {
     }
 };
 
-struct VoxelRenderInfo // この構造体がどこで使われているか不明ですが、保持します
-{
+struct VoxelRenderInfo {
     glm::ivec3 position;
 };
 
@@ -74,15 +61,16 @@ public:
     ~Renderer();
     bool initialize(const FontData &fontData);
     void beginFrame(const glm::vec4 &clearColor);
-    // renderScene のシグネチャに model 行列を追加
     void renderScene(const glm::mat4 &projection, const glm::mat4 &view, const ChunkRenderData &chunkRenderData, const glm::mat4 &model);
     void renderOverlay(int screenWidth, int screenHeight, const std::string &fpsString, const std::string &positionString);
     void endFrame();
 
 private:
     GLuint m_shaderProgram;
-    FontData m_fontData; // FontData は TextRenderer で参照されるため、コピーで保持しても問題ないでしょう
+    FontData m_fontData;
     TextRenderer m_textRenderer;
+    GLuint m_textureID; // テクスチャIDを追加
+    bool loadTexture(const std::string& path); // テクスチャロード関数を追加
 };
 
 #endif // RENDERER_HPP

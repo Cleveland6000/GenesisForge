@@ -1,9 +1,13 @@
 #version 330 core
-out vec4 FragColor; // フラグメントシェーダーの最終出力
+out vec4 FragColor;
 
-in vec3 vertColor; // 頂点シェーダーから受け取る色 (名前が一致しているか？)
+in vec3 ourColor; // 頂点シェーダーから受け取る色 (今回は使用しない)
+in vec2 TexCoord; // 頂点シェーダーから受け取るテクスチャ座標
+
+uniform sampler2D ourTexture; // テクスチャサンプラー
 
 void main()
 {
-    FragColor = vec4(vertColor, 1.0f); // 受け取った色を使用
+    // テクスチャの色のみを使用する
+    FragColor = texture(ourTexture, TexCoord);
 }

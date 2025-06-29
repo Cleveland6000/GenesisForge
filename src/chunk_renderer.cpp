@@ -1,4 +1,3 @@
-// src/chunk_renderer.cpp
 #include "chunk_renderer.hpp"
 #include <iostream>
 
@@ -6,23 +5,18 @@ ChunkRenderData ChunkRenderer::createChunkRenderData(const ChunkMeshData& meshDa
     ChunkRenderData renderData;
 
     if (meshData.vertices.empty() || meshData.indices.empty()) {
-        //std::cerr << "Warning: Attempted to create ChunkRenderData from empty mesh data.\n";
-        return renderData; // 空のデータオブジェクトを返す
+        return renderData;
     }
 
-    // VAO, VBO, EBO を生成
     glGenVertexArrays(1, &renderData.VAO);
     glGenBuffers(1, &renderData.VBO);
     glGenBuffers(1, &renderData.EBO);
 
-    // VAO をバインド
     glBindVertexArray(renderData.VAO);
 
-    // VBO に頂点データをバインドしてアップロード
     glBindBuffer(GL_ARRAY_BUFFER, renderData.VBO);
     glBufferData(GL_ARRAY_BUFFER, meshData.vertices.size() * sizeof(Vertex), meshData.vertices.data(), GL_STATIC_DRAW);
 
-    // EBO にインデックスデータをバインドしてアップロード
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, renderData.EBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, meshData.indices.size() * sizeof(unsigned int), meshData.indices.data(), GL_STATIC_DRAW);
 
@@ -33,11 +27,13 @@ ChunkRenderData ChunkRenderer::createChunkRenderData(const ChunkMeshData& meshDa
     // 色属性 (location = 1)
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, r));
     glEnableVertexAttribArray(1);
+    // テクスチャ座標属性 (location = 2) を追加
+    // Vertex構造体内の 'u' メンバーへのオフセットを指定
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, u));
+    glEnableVertexAttribArray(2);
 
-    // VAO のバインドを解除
     glBindVertexArray(0);
 
-    // インデックス数を設定
     renderData.indexCount = static_cast<GLsizei>(meshData.indices.size());
 
     return renderData;

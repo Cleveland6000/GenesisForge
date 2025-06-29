@@ -8,7 +8,8 @@
 struct Vertex
 {
     float x, y, z;
-    float r, g, b;
+    float r, g, b; // 現在の色情報
+    float u, v;    // テクスチャ座標を追加
 };
 
 struct ChunkMeshData
