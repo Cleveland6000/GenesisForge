@@ -59,13 +59,21 @@ void Renderer::renderScene(const glm::mat4 &projection, const glm::mat4 &view, c
 void Renderer::renderOverlay(int screenWidth, int screenHeight, const std::string &fpsString, const std::string &positionString)
 {
     glm::mat4 orthoProjection = glm::ortho(0.0f, (float)screenWidth, 0.0f, (float)screenHeight);
-    const float TARGET_TEXT_HEIGHT_PX = 60.0f;
-    float textScale = m_fontData.baseFontSize > 0 ? TARGET_TEXT_HEIGHT_PX / (float)m_fontData.baseFontSize : 1.0f;
+
+    // 画面の高さに対する比率でテキストの高さを決定
+    // 例: 画面の高さの約1/15の高さになるように調整
+    const float RELATIVE_TEXT_HEIGHT_RATIO = 1.0f / 15.0f; 
+    float targetTextHeightPx = screenHeight * RELATIVE_TEXT_HEIGHT_RATIO; // ウィンドウの高さに基づいて計算
+
+    float textScale = m_fontData.baseFontSize > 0 ? targetTextHeightPx / (float)m_fontData.baseFontSize : 1.0f;
 
     // HUDテキストのレンダリング
     // Y座標は画面の高さからテキストの高さとマージンを引いて計算
-    m_textRenderer.renderText(fpsString, 10.0f, (float)screenHeight - 60.0f, textScale, glm::vec3(1.0f), orthoProjection);
-    m_textRenderer.renderText(positionString, 10.0f, (float)screenHeight - 60.0f - (TARGET_TEXT_HEIGHT_PX + 10.0f), textScale, glm::vec3(1.0f), orthoProjection);
+    // マージンも画面の高さに連動させるか、相対的な値にするのが望ましい
+    float margin = screenHeight * 0.02f; // 例: 画面の高さの2%をマージンとする
+
+    m_textRenderer.renderText(fpsString, margin, (float)screenHeight - targetTextHeightPx - margin, textScale, glm::vec3(1.0f), orthoProjection);
+    m_textRenderer.renderText(positionString, margin, (float)screenHeight - (targetTextHeightPx * 2) - (margin * 2), textScale, glm::vec3(1.0f), orthoProjection);
 }
 
 void Renderer::endFrame() {
