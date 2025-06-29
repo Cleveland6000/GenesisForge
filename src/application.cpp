@@ -5,11 +5,24 @@
 #include <sstream>
 #include <chrono>
 
-#define SCR_WIDTH 800
-#define SCR_HEIGHT 600
+// GLMの実験的拡張機能を使用するための定義
+// GLMのヘッダーをインクルードする前に定義する必要があります
+#define GLM_ENABLE_EXPERIMENTAL 
+#include <glm/gtx/norm.hpp> // glm::length のために必要 (glm/glm.hpp で含まれることが多いですが、明示的に)
+
+
+// SCR_WIDTH と SCR_HEIGHT は通常、Application::initialize で WindowContext に渡されます。
+// これらのマクロがどこかで定義されているか、あるいは直接定数として使用されているかを
+// 確認してください。ここでは仮に存在するものとします。
+// #define SCR_WIDTH 800
+// #define SCR_HEIGHT 600
 
 Application::Application()
+    // m_projectionMatrix をコンストラクタで初期化する
+    // C26495 警告の解消
+    : m_projectionMatrix(1.0f) 
 {
+    // std::cout はデバッグ用途です。リリースビルドではコメントアウトまたは無効化してください。
     std::cout << "--- Application constructor called. ---\n";
 }
 
@@ -34,6 +47,8 @@ bool Application::initialize()
         return false;
     }
 
+    // フォントロードのパスを確認してください。
+    // 前回「Failed to open font json file」エラーが出た点です。
     if (!m_fontLoader->loadSDFont("../assets/fonts/NotoSansJP-VariableFont_wght.json", "../assets/fonts/noto_sans_jp_atlas.png", *m_fontData))
     {
         std::cerr << "Application: Failed to load font data." << std::endl;
@@ -69,7 +84,7 @@ void Application::run()
     {
         processInput();
         update();
-        render();
+        render(); // ここで描画が行われる
         m_windowContext->swapBuffers();
         m_windowContext->pollEvents();
     }
@@ -149,14 +164,14 @@ bool Application::setupDependenciesAndLoadResources()
     // ChunkManager の初期化時に、X/ZとY軸両方の描画距離を渡す
     m_chunkManager = std::make_unique<ChunkManager>(
         CHUNK_GRID_SIZE, 
-        RENDER_DISTANCE_CHUNKS,      // X/Z軸方向の描画距離
+        RENDER_DISTANCE_CHUNKS,       // X/Z軸方向の描画距離
         WORLD_SEED, 
         NOISE_SCALE, 
         WORLD_MAX_HEIGHT, 
         GROUND_LEVEL,
-        TERRAIN_OCTAVES,       
-        TERRAIN_LACUNARITY,    
-        TERRAIN_PERSISTENCE    
+        TERRAIN_OCTAVES,      
+        TERRAIN_LACUNARITY,     
+        TERRAIN_PERSISTENCE     
     );
     if (!m_chunkManager)
     {
@@ -177,7 +192,7 @@ bool Application::setupDependenciesAndLoadResources()
     m_fullscreenManager->setWindowSizeChangeCallback([this](int w, int h)
                                                      { this->updateProjectionMatrix(w, h); });
     m_fullscreenManager->setMouseResetCallback([this]()
-                                               {
+                                                 {
         if (this->m_inputManager) {
             this->m_inputManager->resetMouseState();
         } });
@@ -240,6 +255,105 @@ void Application::updateFpsAndPositionStrings()
     m_positionString = ss.str();
 }
 
+// 視錐台の平面を結合行列から抽出する関数
+void Application::extractFrustumPlanes(const glm::mat4& viewProjection) {
+    // 結合行列から各平面の情報を抽出
+    // 平面の方程式 Ax + By + Cz + D = 0 に対応
+    // normal = (A, B, C), distance = D
+
+    // 右平面 (Right Plane): viewProjection[0][3] - viewProjection[0][0]
+    m_frustumPlanes[0].normal.x = viewProjection[0][3] - viewProjection[0][0];
+    m_frustumPlanes[0].normal.y = viewProjection[1][3] - viewProjection[1][0];
+    m_frustumPlanes[0].normal.z = viewProjection[2][3] - viewProjection[2][0];
+    m_frustumPlanes[0].distance = viewProjection[3][3] - viewProjection[3][0];
+
+    // 左平面 (Left Plane): viewProjection[0][3] + viewProjection[0][0]
+    m_frustumPlanes[1].normal.x = viewProjection[0][3] + viewProjection[0][0];
+    m_frustumPlanes[1].normal.y = viewProjection[1][3] + viewProjection[1][0];
+    m_frustumPlanes[1].normal.z = viewProjection[2][3] + viewProjection[2][0];
+    m_frustumPlanes[1].distance = viewProjection[3][3] + viewProjection[3][0];
+
+    // 下平面 (Bottom Plane): viewProjection[0][3] + viewProjection[0][1]
+    m_frustumPlanes[2].normal.x = viewProjection[0][3] + viewProjection[0][1];
+    m_frustumPlanes[2].normal.y = viewProjection[1][3] + viewProjection[1][1];
+    m_frustumPlanes[2].normal.z = viewProjection[2][3] + viewProjection[2][1];
+    m_frustumPlanes[2].distance = viewProjection[3][3] + viewProjection[3][1];
+
+    // 上平面 (Top Plane): viewProjection[0][3] - viewProjection[0][1]
+    m_frustumPlanes[3].normal.x = viewProjection[0][3] - viewProjection[0][1];
+    m_frustumPlanes[3].normal.y = viewProjection[1][3] - viewProjection[1][1];
+    m_frustumPlanes[3].normal.z = viewProjection[2][3] - viewProjection[2][1];
+    m_frustumPlanes[3].distance = viewProjection[3][3] - viewProjection[3][1];
+
+    // 遠平面 (Far Plane): viewProjection[0][3] - viewProjection[0][2]
+    m_frustumPlanes[4].normal.x = viewProjection[0][3] - viewProjection[0][2];
+    m_frustumPlanes[4].normal.y = viewProjection[1][3] - viewProjection[1][2];
+    m_frustumPlanes[4].normal.z = viewProjection[2][3] - viewProjection[2][2];
+    m_frustumPlanes[4].distance = viewProjection[3][3] - viewProjection[3][2];
+
+    // 近平面 (Near Plane): viewProjection[0][3] + viewProjection[0][2]
+    m_frustumPlanes[5].normal.x = viewProjection[0][3] + viewProjection[0][2];
+    m_frustumPlanes[5].normal.y = viewProjection[1][3] + viewProjection[1][2];
+    m_frustumPlanes[5].normal.z = viewProjection[2][3] + viewProjection[2][2];
+    m_frustumPlanes[5].distance = viewProjection[3][3] + viewProjection[3][2];
+
+    // すべての平面を正規化する（重要）
+    for (int i = 0; i < 6; ++i) {
+        float length = glm::length(m_frustumPlanes[i].normal);
+        m_frustumPlanes[i].normal /= length;
+        m_frustumPlanes[i].distance /= length;
+    }
+}
+
+// チャンクが視錐台内にあるかテストする関数
+// chunkCoord はチャンクのグリッド座標 (glm::ivec3)
+bool Application::isChunkInFrustum(const glm::ivec3& chunkCoord) const {
+    // チャンクのワールド座標におけるAABBの最小点と最大点を計算
+    // CHUNK_GRID_SIZE はチャンクの1辺のボクセル数
+    glm::vec3 minPoint = glm::vec3(
+        static_cast<float>(chunkCoord.x * CHUNK_GRID_SIZE),
+        static_cast<float>(chunkCoord.y * CHUNK_GRID_SIZE),
+        static_cast<float>(chunkCoord.z * CHUNK_GRID_SIZE)
+    );
+    glm::vec3 maxPoint = glm::vec3(
+        static_cast<float>((chunkCoord.x + 1) * CHUNK_GRID_SIZE),
+        static_cast<float>((chunkCoord.y + 1) * CHUNK_GRID_SIZE),
+        static_cast<float>((chunkCoord.z + 1) * CHUNK_GRID_SIZE)
+    );
+
+    // 各平面に対してテスト
+    for (int i = 0; i < 6; ++i) {
+        const Plane& p = m_frustumPlanes[i];
+
+        // AABB と平面の交差テスト (P-vertex / N-vertex method)
+        // AABBの8つの頂点のうち、1つでも平面の内側にあるかチェック
+        // 最適化として、平面法線とのドット積が最も遠い頂点と最も近い頂点を考慮する
+
+        glm::vec3 p_vertex = minPoint; // 平面法線と同じ方向のAABBの頂点
+        glm::vec3 n_vertex = maxPoint; // 平面法線と逆方向のAABBの頂点
+
+        if (p.normal.x >= 0) {
+            p_vertex.x = maxPoint.x;
+            n_vertex.x = minPoint.x;
+        }
+        if (p.normal.y >= 0) {
+            p_vertex.y = maxPoint.y;
+            n_vertex.y = minPoint.y;
+        }
+        if (p.normal.z >= 0) {
+            p_vertex.z = maxPoint.z;
+            n_vertex.z = minPoint.z;
+        }
+
+        // AABBの最も遠い頂点 (p_vertex) が平面の裏側にある場合、AABBは完全に平面の裏側にある
+        // => 視錐台の外側にあると判断
+        if (glm::dot(p.normal, p_vertex) + p.distance < 0) {
+            return false; // この平面の外側にあるので、視錐台の外
+        }
+    }
+    return true; // すべての平面の内側にある可能性がある
+}
+
 void Application::render()
 {
     if (!m_renderer)
@@ -251,24 +365,36 @@ void Application::render()
     m_renderer->beginFrame(glm::vec4(CLEAR_COLOR_R, CLEAR_COLOR_G, CLEAR_COLOR_B, CLEAR_COLOR_A));
 
     glm::mat4 view = m_camera->getViewMatrix();
+    // ここで結合行列 (View-Projection Matrix) を計算
+    glm::mat4 viewProjection = m_projectionMatrix * view;
+
+    // 毎フレーム、視錐台の平面を抽出する
+    // これを呼ぶことで m_frustumPlanes が更新される
+    extractFrustumPlanes(viewProjection); 
 
     // ChunkManager からすべてのチャンクのレンダリングデータを取得し、ループして描画
     if (m_chunkManager) {
         const auto& allRenderData = m_chunkManager->getAllRenderData();
         for (const auto& pair : allRenderData) {
-            // pair.first はチャンクのワールド座標（glm::ivec3）
             glm::ivec3 chunkCoord = pair.first;
+            const ChunkRenderData& renderData = pair.second; // renderData を取得
+
+            // !!!! フラスタムカリングのチェックを追加 !!!!
+            if (!isChunkInFrustum(chunkCoord)) {
+                // チャンクが視錐台の外にある場合、このチャンクの描画をスキップ
+                continue; 
+            }
+
             // チャンクのワールド位置を計算し、model 行列を作成
-            // CHUNK_GRID_SIZE はチャンクのサイズ（ボクセル数）
-            // この model 行列が、チャンクを正しいワールド位置に移動させる役割を果たす
             glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(
                 chunkCoord.x * CHUNK_GRID_SIZE,
                 chunkCoord.y * CHUNK_GRID_SIZE, 
                 chunkCoord.z * CHUNK_GRID_SIZE
             ));
             
-            // Renderer::renderScene に model 行列を追加して呼び出す
-            m_renderer->renderScene(m_projectionMatrix, view, pair.second, model);
+            // Renderer::renderScene に model 行列とレンダリングデータを渡して呼び出す
+            // renderScene 内部で indexCount > 0 のチェックが必要です (既に実装済み)
+            m_renderer->renderScene(m_projectionMatrix, view, renderData, model);
         }
     }
 

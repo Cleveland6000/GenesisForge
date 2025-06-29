@@ -1,14 +1,14 @@
 #include "chunk_manager.hpp"
 #include <iostream>
-#include <chrono> // 時間計測に使用する場合は残す
-#include <algorithm> // std::abs のために必要
-#include <limits> // std::numeric_limits のために必要
+#include <chrono>                   // 時間計測に使用する場合は残す
+#include <algorithm>                // std::abs のために必要
+#include <limits>                   // std::numeric_limits のために必要
 #include "chunk_mesh_generator.hpp" // ChunkMeshData, ChunkMeshGenerator::generateMesh のために必要
 
 // コンストラクタ
 ChunkManager::ChunkManager(int chunkSize, int renderDistanceXZ, unsigned int noiseSeed, float noiseScale,
                            int worldMaxHeight, int groundLevel, int octaves, float lacunarity, float persistence)
-    : m_chunkSize(chunkSize), m_renderDistance(renderDistanceXZ), 
+    : m_chunkSize(chunkSize), m_renderDistance(renderDistanceXZ),
       m_terrainGenerator(std::make_unique<TerrainGenerator>(noiseSeed, noiseScale, worldMaxHeight, groundLevel,
                                                             octaves, lacunarity, persistence)),
       m_lastPlayerChunkCoord(std::numeric_limits<int>::max()) // 初期値として到達不能な座標を設定
@@ -37,25 +37,26 @@ void ChunkManager::update(const glm::vec3 &playerPosition)
     // 新しいチャンクが視界に入ってくる可能性があるため、常に実行するのが安全です。
     if (currentChunkCoord != m_lastPlayerChunkCoord)
     {
-        loadChunksInArea(currentChunkCoord); // 指定された描画距離内のチャンクをロード（または既存を保持）
-        unloadDistantChunks(currentChunkCoord); // 描画距離外に出たチャンクをアンロード
+        loadChunksInArea(currentChunkCoord);        // 指定された描画距離内のチャンクをロード（または既存を保持）
+        unloadDistantChunks(currentChunkCoord);     // 描画距離外に出たチャンクをアンロード
         m_lastPlayerChunkCoord = currentChunkCoord; // 現在の座標を更新します
+
+        for (auto &pair : m_chunks)
+        {
+            if (pair.second->isDirty())
+            {
+                updateChunkMesh(pair.first, pair.second); // メッシュを再生成
+                pair.second->setDirty(false);             // ダーティフラグをリセットします
+            }
+        }
     }
     else
     {
         // チャンク座標が変わらない場合でもロードは確認します (hasChunkで重複は防がれます)
-        //loadChunksInArea(currentChunkCoord);
+        // loadChunksInArea(currentChunkCoord);
     }
 
     // ダーティなチャンク（内容が変更されたチャンク）のメッシュを更新します
-    for (auto &pair : m_chunks)
-    {
-        if (pair.second->isDirty())
-        {
-            updateChunkMesh(pair.first, pair.second); // メッシュを再生成
-            pair.second->setDirty(false); // ダーティフラグをリセットします
-        }
-    }
 }
 
 // 指定されたワールド座標のチャンクが存在するかどうかをチェックします
@@ -79,7 +80,7 @@ std::shared_ptr<Chunk> ChunkManager::getChunk(const glm::ivec3 &chunkCoord)
 std::shared_ptr<Chunk> ChunkManager::generateChunk(const glm::ivec3 &chunkCoord)
 {
     // コンソール出力はデバッグ用です
-    //std::cout << "Generating chunk at: (" << chunkCoord.x << ", " << chunkCoord.y << ", " << chunkCoord.z << ")\n";
+    // std::cout << "Generating chunk at: (" << chunkCoord.x << ", " << chunkCoord.y << ", " << chunkCoord.z << ")\n";
 
     std::shared_ptr<Chunk> newChunk = std::make_shared<Chunk>(m_chunkSize);
 
@@ -126,14 +127,14 @@ std::shared_ptr<Chunk> ChunkManager::generateChunk(const glm::ivec3 &chunkCoord)
                     int terrainHeightAtXZ = heightMap[x + z * m_chunkSize];
                     isSolid = (worldY < terrainHeightAtXZ); // 地形より下はソリッドです
                 }
-                
+
                 // 計算したボクセルデータを一時ベクトルに格納します
                 size_t index = static_cast<size_t>(x + y * m_chunkSize + z * m_chunkSize * m_chunkSize);
                 tempVoxels[index] = isSolid;
             }
         }
     }
-    
+
     // 一時ベクトルに格納された全ボクセルデータをチャンクに一括設定します
     newChunk->setVoxels(tempVoxels);
     newChunk->setDirty(true); // ボクセルデータが設定されたのでダーティフラグを立てます
@@ -145,13 +146,13 @@ void ChunkManager::updateChunkMesh(const glm::ivec3 &chunkCoord, std::shared_ptr
 {
     // ChunkMeshGenerator を使用してメッシュデータを生成します
     ChunkMeshData meshData = ChunkMeshGenerator::generateMesh(*chunk);
-    
+
     // レンダリングデータを更新します（既存のものを更新するか、新しく作成するロジックは ChunkRenderer 側で管理）
     // ここでは単純に置き換えですが、GPUリソースの再利用を検討すべき点です
     m_chunkRenderData[chunkCoord] = ChunkRenderer::createChunkRenderData(meshData);
-    
+
     // コンソール出力はデバッグ用です
-    //std::cout << "Updated mesh for chunk at: (" << chunkCoord.x << ", " << chunkCoord.y << ", " << chunkCoord.z << ")\n";
+    // std::cout << "Updated mesh for chunk at: (" << chunkCoord.x << ", " << chunkCoord.y << ", " << chunkCoord.z << ")\n";
 }
 
 // 指定された座標範囲内のチャンクをロードします
@@ -203,9 +204,9 @@ void ChunkManager::unloadDistantChunks(const glm::ivec3 &centerChunkCoord)
     for (const auto &coord : chunksToUnload)
     {
         // コンソール出力はデバッグ用です
-        //std::cout << "Unloading chunk at: (" << coord.x << ", " << coord.y << ", " << coord.z << ")\n";
+        // std::cout << "Unloading chunk at: (" << coord.x << ", " << coord.y << ", " << coord.z << ")\n";
         m_chunkRenderData.erase(coord); // レンダリングデータも削除します
-        m_chunks.erase(coord); // チャンクデータも削除します
+        m_chunks.erase(coord);          // チャンクデータも削除します
     }
 }
 
