@@ -1,16 +1,21 @@
-// src/chunk_renderer.hpp
 #ifndef CHUNK_RENDERER_HPP
 #define CHUNK_RENDERER_HPP
 
-#include <glad/glad.h>
-#include "renderer.hpp" // ChunkRenderData の定義を含む
-#include "chunk_mesh_generator.hpp" // ChunkMeshData の定義を含む
+#include <vector>
+#include <glm/glm.hpp> // glm::vec3, glm::vec2 などが必要な場合
+#include "chunk_render_data.hpp" // ChunkRenderData の定義をインクルード
 
-class ChunkRenderer {
+// ChunkMeshData の前方宣言
+struct ChunkMeshData;
+
+class ChunkRenderer
+{
 public:
-    // ChunkMeshData から OpenGL 用の ChunkRenderData を生成する
-    // この関数はGPUリソースを作成します
     static ChunkRenderData createChunkRenderData(const ChunkMeshData& meshData);
+    // 新しく追加する関数: OpenGLリソースを解放します
+    static void deleteChunkRenderData(const ChunkRenderData& data);
+
+    static void renderChunk(const ChunkRenderData& renderData, const glm::vec3& chunkWorldPos);
 };
 
 #endif // CHUNK_RENDERER_HPP

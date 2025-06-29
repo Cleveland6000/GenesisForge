@@ -222,7 +222,7 @@ void Application::render()
 
     extractFrustumPlanes(viewProjection);
 
-    const auto &allRenderData = m_chunkManager->getAllRenderData();
+    const auto &allRenderData = m_chunkManager->getRenderData();
     for (const auto &pair : allRenderData)
     {
         glm::ivec3 chunkCoord = pair.first;

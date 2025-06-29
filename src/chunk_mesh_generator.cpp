@@ -1,358 +1,343 @@
+#include "chunk_manager.hpp"
+#include <iostream>
+#include <chrono>
+#include <algorithm>
+#include <limits>
+#include <glm/glm.hpp> // glm::ivec3 のために必要
 #include "chunk_mesh_generator.hpp"
-#include <glm/glm.hpp>
-#include <array>
-#include <vector>
-#include <iostream> // デバッグ用に一時的に追加
-#include <limits>   // std::numeric_limits のために追加
-#include <random>   // 乱数生成のために追加
 
-// 立方体の基本頂点データ (変更なし)
-const std::vector<Vertex> baseCubeVertices = {
-    {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}, // 0: Back-bottom-left (Z-)
-    {1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}, // 1: Back-bottom-right (Z-)
-    {1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}, // 2: Back-top-right (Z-)
-    {0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}, // 3: Back-top-left (Z-)
-    {1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}, // 4: Front-top-right (Z+)
-    {1.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}, // 5: Front-bottom-right (Z+)
-    {0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}, // 6: Front-bottom-left (Z+)
-    {0.0f, 1.0f, 1.0f, 0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}  // 7: Front-top-left (Z+)
-};
+// ChunkMeshGenerator 内で定義されている neighborOffsets を使用するための外部宣言
+// chunk_mesh_generator.hpp で定義されていることを前提とします。
+// もし定義されていない場合、こちらで定義するか、適切な場所からインポートしてください。
+// 例: extern const glm::ivec3 neighborOffsets[6];
 
-const std::array<std::array<unsigned int, 4>, 6> cubeFaceBaseIndices = {
-    std::array<unsigned int, 4>{0, 3, 2, 1}, // 0: Back face (Z-)
-    std::array<unsigned int, 4>{6, 5, 4, 7}, // 1: Front face (Z+)
-    std::array<unsigned int, 4>{0, 6, 7, 3}, // 2: Left face (X-)
-    std::array<unsigned int, 4>{1, 2, 4, 5}, // 3: Right face (X+)
-    std::array<unsigned int, 4>{0, 1, 5, 6}, // 4: Bottom face (Y-)
-    std::array<unsigned int, 4>{3, 7, 4, 2}  // 5: Top face (Y+)
-};
-
-// neighborOffsets は chunk_mesh_generator.hpp に移動済み
-
-const std::array<glm::vec3, 6> faceNormals = {
-    glm::vec3(0.0f, 0.0f, -1.0f), // 0: Back face (Z-)
-    glm::vec3(0.0f, 0.0f, 1.0f),  // 1: Front face (Z+)
-    glm::vec3(-1.0f, 0.0f, 0.0f), // 2: Left face (X-)
-    glm::vec3(1.0f, 0.0f, 0.0f),  // 3: Right face (X+)
-    glm::vec3(0.0f, -1.0f, 0.0f), // 4: Bottom face (Y-)
-    glm::vec3(0.0f, 1.0f, 0.0f)   // 5: Top face (Y+)
-};
-
-const std::array<glm::vec2, 4> faceUVs = {
-    glm::vec2(0.0f, 0.0f), // 左下 (bottom-left)
-    glm::vec2(1.0f, 0.0f), // 右下 (bottom-right)
-    glm::vec2(1.0f, 1.0f), // 右上 (top-right)
-    glm::vec2(0.0f, 1.0f)  // 左上 (top-left)
-};
-
-inline size_t getVoxelIndex(int x, int y, int z, int chunkSize)
+// コンストラクタ
+// プレイヤーの位置に基づいてチャンクを更新（ロード/アンロード/メッシュ更新）
+void ChunkManager::update(const glm::vec3 &playerPosition)
 {
-    if (x < 0 || x >= chunkSize || y < 0 || y >= chunkSize || z < 0 || z >= chunkSize)
-    {
-        // 範囲外のアクセスは安全な値を返す
-        return std::numeric_limits<size_t>::max(); // 無効なインデックス
-    }
-    return static_cast<size_t>(x + y * chunkSize + z * chunkSize * chunkSize);
-}
+    glm::ivec3 currentChunkCoord = getChunkCoordFromWorldPos(playerPosition);
 
-// 特定のボクセルの隣接ボクセルを取得するヘルパー関数
-// 隣接チャンクも考慮する
-bool isVoxelSolid(int x, int y, int z, int chunkSize,
-                  const Chunk &currentChunk,
-                  const Chunk *neighbor_neg_x, const Chunk *neighbor_pos_x,
-                  const Chunk *neighbor_neg_y, const Chunk *neighbor_pos_y,
-                  const Chunk *neighbor_neg_z, const Chunk *neighbor_pos_z)
-{
-
-    if (x >= 0 && x < chunkSize &&
-        y >= 0 && y < chunkSize &&
-        z >= 0 && z < chunkSize)
+    // プレイヤーのチャンク座標が変わった場合のみ処理を実行
+    if (currentChunkCoord != m_lastPlayerChunkCoord)
     {
-        // 現在のチャンク内のボクセル
-        return currentChunk.getVoxels()[getVoxelIndex(x, y, z, chunkSize)];
-    }
-    else // 隣接チャンクのボクセル
-    {
-        const Chunk *targetChunk = nullptr;
-        int targetX = x;
-        int targetY = y;
-        int targetZ = z;
+        loadChunksInArea(currentChunkCoord);
+        unloadDistantChunks(currentChunkCoord);
+        m_lastPlayerChunkCoord = currentChunkCoord;
 
-        if (x < 0)
+        // m_chunksを安全に反復処理し、ダーティなチャンクをメッシュ生成キューに追加
         {
-            targetChunk = neighbor_neg_x;
-            targetX = chunkSize + x;
-        }
-        else if (x >= chunkSize)
-        {
-            targetChunk = neighbor_pos_x;
-            targetX = x - chunkSize;
-        }
-        else if (y < 0)
-        {
-            targetChunk = neighbor_neg_y;
-            targetY = chunkSize + y;
-        }
-        else if (y >= chunkSize)
-        {
-            targetChunk = neighbor_pos_y;
-            targetY = y - chunkSize; 
-        }
-        else if (z < 0)
-        {
-            targetChunk = neighbor_neg_z;
-            targetZ = chunkSize + z;
-        }
-        else if (z >= chunkSize)
-        {
-            targetChunk = neighbor_pos_z;
-            targetZ = z - chunkSize;
-        }
+            std::unique_lock<std::mutex> mapLock(m_chunksMutex); // m_chunksへのアクセスを保護
+            std::unique_lock<std::mutex> queueLock(m_meshGenerationMutex); // メッシュキューへのアクセスを保護
 
-        if (targetChunk != nullptr &&
-            targetX >= 0 && targetX < chunkSize &&
-            targetY >= 0 && targetY < chunkSize &&
-            targetZ >= 0 && targetZ < chunkSize)
-        {
-            return targetChunk->getVoxels()[getVoxelIndex(targetX, targetY, targetZ, chunkSize)];
-        }
-    }
-    return false; // 範囲外またはチャンクが存在しない場合はソリッドではないとみなす
-}
-
-// 頂点ごとのアンビエントオクルージョンを計算するヘルパー関数
-float getAmbientOcclusion(int x, int y, int z, int chunkSize,
-                          const Chunk &currentChunk,
-                          const Chunk *neighbor_neg_x, const Chunk *neighbor_pos_x,
-                          const Chunk *neighbor_neg_y, const Chunk *neighbor_pos_y,
-                          const Chunk *neighbor_neg_z, const Chunk *neighbor_pos_z,
-                          float cornerDX, float cornerDY, float cornerDZ,
-                          int faceIndex)
-{
-    int side1_dx = 0, side1_dy = 0, side1_dz = 0;
-    int side2_dx = 0, side2_dy = 0, side2_dz = 0;
-    int corner_dx = 0, corner_dy = 0, corner_dz = 0;
-
-    // 面の法線方向 (faceIndex) と頂点の相対位置 (cornerDX, cornerDY, cornerDZ) に応じて、
-    // チェックする3つのボクセルを決定します。
-
-    // X- 面 (左) のAO (Normal: (-1, 0, 0))
-    if (faceIndex == 2)
-    {
-        side1_dy = (cornerDY == 0.0f) ? -1 : 1;
-        side2_dz = (cornerDZ == 0.0f) ? -1 : 1;
-        corner_dy = side1_dy;
-        corner_dz = side2_dz;
-    }
-    // X+ 面 (右) のAO (Normal: (1, 0, 0))
-    else if (faceIndex == 3)
-    {
-        x = x + 1; // 隣接ボクセルは常にx+1の方向にある
-        side1_dy = (cornerDY == 0.0f) ? -1 : 1;
-        side2_dz = (cornerDZ == 0.0f) ? -1 : 1;
-        corner_dy = side1_dy;
-        corner_dz = side2_dz;
-    }
-    // Y- 面 (底) のAO (Normal: (0, -1, 0))
-    else if (faceIndex == 4)
-    {
-        side1_dx = (cornerDX == 0.0f) ? -1 : 1;
-        side2_dz = (cornerDZ == 0.0f) ? -1 : 1;
-        corner_dx = side1_dx;
-        corner_dz = side2_dz;
-    }
-    // Y+ 面 (上) のAO (Normal: (0, 1, 0))
-    else if (faceIndex == 5)
-    {
-        y = y + 1; // 隣接ボクセルは常にy+1の方向にある
-        side1_dx = (cornerDX == 0.0f) ? -1 : 1;
-        side2_dz = (cornerDZ == 0.0f) ? -1 : 1;
-        corner_dx = side1_dx;
-        corner_dz = side2_dz;
-    }
-    // Z- 面 (奥) のAO (Normal: (0, 0, -1))
-    else if (faceIndex == 0)
-    {
-        side1_dx = (cornerDX == 0.0f) ? -1 : 1;
-        side2_dy = (cornerDY == 0.0f) ? -1 : 1;
-        corner_dx = side1_dx;
-        corner_dy = side2_dy;
-    }
-    // Z+ 面 (手前) のAO (Normal: (0, 0, 1))
-    else if (faceIndex == 1)
-    {
-        z = z + 1; // 隣接ボクセルは常にz+1の方向にある
-        side1_dx = (cornerDX == 0.0f) ? -1 : 1;
-        side2_dy = (cornerDY == 0.0f) ? -1 : 1;
-        corner_dx = side1_dx;
-        corner_dy = side2_dy;
-    }
-
-    // 各ボクセルのソリッド状態をチェック
-    bool side1_solid = isVoxelSolid(x + side1_dx, y + side1_dy, z + side1_dz, chunkSize, currentChunk, neighbor_neg_x, neighbor_pos_x, neighbor_neg_y, neighbor_pos_y, neighbor_neg_z, neighbor_pos_z);
-    bool side2_solid = isVoxelSolid(x + side2_dx, y + side2_dy, z + side2_dz, chunkSize, currentChunk, neighbor_neg_x, neighbor_pos_x, neighbor_neg_y, neighbor_pos_y, neighbor_neg_z, neighbor_pos_z);
-    bool corner_solid = isVoxelSolid(x + corner_dx, y + corner_dy, z + corner_dz, chunkSize, currentChunk, neighbor_neg_x, neighbor_pos_x, neighbor_neg_y, neighbor_pos_y, neighbor_neg_z, neighbor_pos_z);
-
-    // 0fps のAO値を計算
-    if (side1_solid && side2_solid && corner_solid)
-    {
-        return 0.0f; // 最も暗い
-    }
-    else if ((side1_solid && side2_solid) || (side1_solid && corner_solid) || (side2_solid && corner_solid))
-    {
-        return 1.0f;
-    }
-    else if (side1_solid || side2_solid || corner_solid)
-    {
-        return 2.0f;
-    }
-    else
-    {
-        return 3.0f; // 最も明るい
-    }
-}
-
-ChunkMeshData ChunkMeshGenerator::generateMesh(const Chunk &chunk,
-                                               const Chunk *neighbor_neg_x,
-                                               const Chunk *neighbor_pos_x,
-                                               const Chunk *neighbor_neg_y,
-                                               const Chunk *neighbor_pos_y,
-                                               const Chunk *neighbor_neg_z,
-                                               const Chunk *neighbor_pos_z)
-{
-    ChunkMeshData meshData;
-    int chunkSize = chunk.getSize();
-    const std::vector<bool> &voxels = chunk.getVoxels();
-
-    // チャンクのワールド座標を取得（ChunkクラスにgetCoord()メソッドがあると仮定）
-    // もしChunkクラスにgetCoord()がない場合は、引数として渡すか、別の方法でチャンクのユニークな識別子を取得してください。
-    glm::ivec3 chunkCoord = chunk.getCoord(); 
-    
-    // チャンクの座標をシードとして使用することで、同じチャンクは常に同じ乱数パターンを生成します。
-    // 座標が負になる可能性があるので、大きな素数で乗算して衝突を減らします。
-    std::seed_seq seed_seq{
-        static_cast<std::uint32_t>(chunkCoord.x),
-        static_cast<std::uint32_t>(chunkCoord.y),
-        static_cast<std::uint32_t>(chunkCoord.z)
-    };
-    std::mt19937 rng(seed_seq);
-    
-    // 回転用: 0=0deg, 1=90deg, 2=180deg, 3=270deg
-    std::uniform_int_distribution<int> rotation_dist(0, 3); 
-    // 反転用: 0=反転なし, 1=水平反転
-    std::uniform_int_distribution<int> flip_dist(0, 1); 
-
-    meshData.vertices.reserve(chunkSize * chunkSize * chunkSize * 4 * 6);
-    meshData.indices.reserve(chunkSize * chunkSize * chunkSize * 6 * 6);
-
-    for (int z = 0; z < chunkSize; ++z)
-    {
-        for (int y = 0; y < chunkSize; ++y)
-        {
-            for (int x = 0; x < chunkSize; ++x)
+            for (auto &pair : m_chunks)
             {
-                // ここでボクセルの種類を考慮し、草ブロックの場合のみUVを回転・反転させるといった制御も可能
-                // if (voxels[getVoxelIndex(x, y, z, chunkSize)] && chunk.getVoxelType(x,y,z) == BlockType::GRASS) { ... }
-                if (voxels[getVoxelIndex(x, y, z, chunkSize)])
+                if (pair.second->isDirty())
                 {
-                    size_t currentVertexCount = meshData.vertices.size();
+                    m_meshGenerationQueue.push(pair.first);
+                    pair.second->setDirty(false); // キューに入れたらダーティフラグをクリア
+                }
+            }
+            // メッシュキューにタスクが追加されたことをワーカースレッドに通知
+            queueLock.unlock(); // ロックは通知前に解放しても良いが、ここでは明示的に。
+            m_meshGenerationCondVar.notify_all(); // すべてのワーカースレッドに通知
+        } // mapLock はこのスコープを抜けるときに解放される
+    }
 
-                    // このボクセルに適用するUV回転パターンと反転パターンをランダムに決定
-                    // ボクセルごとに同じパターンが適用されるように、面ループの外で決定
-                    // AOの計算もこのボクセルに対して行われるため、ボクセルごとの乱数で問題ありません。
-                    int rotationAmount = rotation_dist(rng);
-                    bool flipHorizontal = (flip_dist(rng) == 1);
+    // 完了したメッシュデータを処理 (これはメインスレッドで行う)
+    processCompletedMeshes();
+}
 
-                    for (int i = 0; i < 6; ++i) // 6面すべてについてループ
-                    {
+// 指定されたワールド座標のチャンクが存在するかどうかをチェックします
+bool ChunkManager::hasChunk(const glm::ivec3 &chunkCoord) const
+{
+    std::unique_lock<std::mutex> lock(m_chunksMutex); // m_chunksへのアクセスを保護
+    return m_chunks.count(chunkCoord) > 0;
+}
+
+// 指定されたチャンク座標のチャンクを取得します
+std::shared_ptr<Chunk> ChunkManager::getChunk(const glm::ivec3 &chunkCoord)
+{
+    std::unique_lock<std::mutex> lock(m_chunksMutex); // m_chunksへのアクセスを保護
+    auto it = m_chunks.find(chunkCoord);
+    if (it != m_chunks.end())
+    {
+        return it->second;
+    }
+    return nullptr;
+}
+
+// チャンクを生成して初期化（ボクセルデータを一括設定）
+std::shared_ptr<Chunk> ChunkManager::generateChunk(const glm::ivec3 &chunkCoord)
+{
+    // ChunkコンストラクタにchunkCoordを渡す
+    std::shared_ptr<Chunk> newChunk = std::make_shared<Chunk>(m_chunkSize, chunkCoord);
+
+    if (!m_terrainGenerator)
+    {
+        std::cerr << "Error: TerrainGenerator instance is not initialized in ChunkManager.\n";
+        return newChunk;
+    }
+
+    std::vector<int> heightMap(m_chunkSize * m_chunkSize);
+    for (int x = 0; x < m_chunkSize; ++x)
+    {
+        for (int z = 0; z < m_chunkSize; ++z)
+        {
+            float worldX = (float)x + (float)chunkCoord.x * m_chunkSize;
+            float worldZ = (float)z + (float)chunkCoord.z * m_chunkSize;
+            heightMap[x + z * m_chunkSize] = m_terrainGenerator->getTerrainHeight(worldX, worldZ);
+        }
+    }
+
+    std::vector<bool> tempVoxels(m_chunkSize * m_chunkSize * m_chunkSize);
+
+    for (int z = 0; z < m_chunkSize; ++z)
+    {
+        for (int y = 0; y < m_chunkSize; ++y)
+        {
+            for (int x = 0; x < m_chunkSize; ++x)
+            {
+                float worldY = (float)y + (float)chunkCoord.y * m_chunkSize;
+
+                bool isSolid;
+                if (worldY < m_terrainGenerator->getGroundLevel())
+                {
+                    isSolid = true;
+                }
+                else
+                {
+                    int terrainHeightAtXZ = heightMap[x + z * m_chunkSize];
+                    isSolid = (worldY < terrainHeightAtXZ);
+                }
+
+                size_t index = static_cast<size_t>(x + y * m_chunkSize + z * m_chunkSize * m_chunkSize);
+                tempVoxels[index] = isSolid;
+            }
+        }
+    }
+
+    newChunk->setVoxels(tempVoxels);
+    newChunk->setDirty(true); // 新しく生成されたチャンクはダーティなのでメッシュ生成が必要
+    return newChunk;
+}
+
+// チャンクのメッシュを生成し、レンダリングデータを更新します (この関数はもう直接呼び出されず、ワーカースレッドに移行)
+// ただし、ChunkMeshGenerator::generateMesh が呼ばれるために、ChunkManager の getChunk を利用する場合があるので、
+// updateChunkMesh は meshGenerationWorker のロジックに統合されます。
+void ChunkManager::updateChunkMesh(const glm::ivec3 &chunkCoord, std::shared_ptr<Chunk> chunk)
+{
+    // この関数は、マルチスレッド化によって直接呼ばれることはなくなります。
+    // そのロジックは meshGenerationWorker() に移行します。
+    // メッシュ生成のロジックをここに残すのは、ChunkMeshGenerator::generateMesh の引数として渡すためです。
+
+    // これは ChunkMeshGenerator::generateMesh が隣接チャンクを必要とすることを明確にするためのヘルパーです
+    // 隣接チャンクを取得 (m_chunksへのアクセスなので、呼び出し側でm_chunksMutexを保護する必要がある)
+    const Chunk* neighbor_neg_x = getChunk(glm::ivec3(chunkCoord.x - 1, chunkCoord.y, chunkCoord.z)).get();
+    const Chunk* neighbor_pos_x = getChunk(glm::ivec3(chunkCoord.x + 1, chunkCoord.y, chunkCoord.z)).get();
+    const Chunk* neighbor_neg_y = getChunk(glm::ivec3(chunkCoord.x, chunkCoord.y - 1, chunkCoord.z)).get();
+    const Chunk* neighbor_pos_y = getChunk(glm::ivec3(chunkCoord.x, chunkCoord.y + 1, chunkCoord.z)).get();
+    const Chunk* neighbor_neg_z = getChunk(glm::ivec3(chunkCoord.x, chunkCoord.y, chunkCoord.z - 1)).get();
+    const Chunk* neighbor_pos_z = getChunk(glm::ivec3(chunkCoord.x, chunkCoord.y, chunkCoord.z + 1)).get();
+    
+    // ChunkMeshGenerator を使用してメッシュデータを生成します
+    ChunkMeshData meshData = ChunkMeshGenerator::generateMesh(
+        *chunk,
+        neighbor_neg_x, neighbor_pos_x,
+        neighbor_neg_y, neighbor_pos_y,
+        neighbor_neg_z, neighbor_pos_z
+    );
+
+    // 生成されたメッシュデータをレンダリングデータとして保存
+    // これはワーカースレッド内では行わず、完了キューを通じてメインスレッドで行う
+    // m_chunkRenderData[chunkCoord] = ChunkRenderer::createChunkRenderData(meshData);
+}
+
+// 指定された座標範囲内のチャンクをロードします
+void ChunkManager::loadChunksInArea(const glm::ivec3 &centerChunkCoord)
+{
+    // m_chunksへの変更があるのでロック
+    std::unique_lock<std::mutex> lock(m_chunksMutex); 
+    
+    for (int x = -m_renderDistance; x <= m_renderDistance; ++x)
+    {
+        for (int y = -m_renderDistance; y <= m_renderDistance; ++y)
+        {
+            for (int z = -m_renderDistance; z <= m_renderDistance; ++z)
+            {
+                glm::ivec3 currentChunkCoord = glm::ivec3(centerChunkCoord.x + x, centerChunkCoord.y + y, centerChunkCoord.z + z);
+
+                if (m_chunks.count(currentChunkCoord) == 0) // hasChunk() の代わりに直接 m_chunks.count を使用 (ロックを既に持っているため)
+                {
+                    std::shared_ptr<Chunk> newChunk = generateChunk(currentChunkCoord); // generateChunkは自身の内部でm_chunksMutexを必要としない
+                    m_chunks[currentChunkCoord] = newChunk;
+                    
+                    // 新しいチャンクがロードされたときに、その隣接チャンク（既に存在する場合）もダーティにする
+                    // neighborOffsets は ChunkMeshGenerator.hpp で定義されていると仮定
+                    for (int i = 0; i < 6; ++i) {
                         glm::ivec3 offset = neighborOffsets[i];
-                        int neighborX = x + offset.x;
-                        int neighborY = y + offset.y;
-                        int neighborZ = z + offset.z;
-
-                        bool renderFace = true;
-                        if (isVoxelSolid(neighborX, neighborY, neighborZ, chunkSize,
-                                         chunk,
-                                         neighbor_neg_x, neighbor_pos_x,
-                                         neighbor_neg_y, neighbor_pos_y,
-                                         neighbor_neg_z, neighbor_pos_z))
-                        {
-                            renderFace = false; // 隣接ボクセルがソリッドなので、この面は描画不要
-                        }
-
-                        if (renderFace)
-                        {
-                            glm::vec3 currentFaceNormal = faceNormals[i];
-
-                            for (int v_idx = 0; v_idx < 4; ++v_idx) // 4つの頂点についてループ
-                            {
-                                unsigned int baseIdx = cubeFaceBaseIndices[i][v_idx];
-                                Vertex baseVertex = baseCubeVertices[baseIdx];
-
-                                Vertex newVertex = baseVertex;
-                                newVertex.x += x;
-                                newVertex.y += y;
-                                newVertex.z += z;
-
-                                // ここで元のUV座標を取得
-                                glm::vec2 uv = faceUVs[v_idx];
-
-                                // まず回転を適用
-                                switch (rotationAmount) {
-                                    case 1: // 90度回転 (反時計回り)
-                                        uv = glm::vec2(1.0f - uv.y, uv.x);
-                                        break;
-                                    case 2: // 180度回転
-                                        uv = glm::vec2(1.0f - uv.x, 1.0f - uv.y);
-                                        break;
-                                    case 3: // 270度回転 (反時計回り)
-                                        uv = glm::vec2(uv.y, 1.0f - uv.x);
-                                        break;
-                                    default: // 0度回転 (case 0)
-                                        // 何もしない
-                                        break;
-                                }
-
-                                // 次に水平反転を適用 (U座標のみ反転)
-                                if (flipHorizontal) {
-                                    uv.x = 1.0f - uv.x;
-                                }
-                                // 必要であれば垂直反転 (uv.y = 1.0f - uv.y;) も追加可能
-
-                                newVertex.u = uv.x;
-                                newVertex.v = uv.y;
-
-                                newVertex.nx = currentFaceNormal.x;
-                                newVertex.ny = currentFaceNormal.y;
-                                newVertex.nz = currentFaceNormal.z;
-
-                                // AO値を計算して設定
-                                newVertex.ao = getAmbientOcclusion(x, y, z, chunkSize,
-                                                                   chunk,
-                                                                   neighbor_neg_x, neighbor_pos_x,
-                                                                   neighbor_neg_y, neighbor_pos_y,
-                                                                   neighbor_neg_z, neighbor_pos_z,
-                                                                   baseVertex.x, baseVertex.y, baseVertex.z,
-                                                                   i);
-
-                                meshData.vertices.push_back(newVertex);
-                            }
-
-                            // インデックスは常に同じ順序
-                            meshData.indices.push_back(static_cast<unsigned int>(currentVertexCount) + 0);
-                            meshData.indices.push_back(static_cast<unsigned int>(currentVertexCount) + 1);
-                            meshData.indices.push_back(static_cast<unsigned int>(currentVertexCount) + 2);
-
-                            meshData.indices.push_back(static_cast<unsigned int>(currentVertexCount) + 0);
-                            meshData.indices.push_back(static_cast<unsigned int>(currentVertexCount) + 2);
-                            meshData.indices.push_back(static_cast<unsigned int>(currentVertexCount) + 3);
-
-                            currentVertexCount += 4;
+                        glm::ivec3 neighborCoord = currentChunkCoord + offset;
+                        // getChunk() は m_chunksMutex を使用しているので、ここでは再ロックは不要
+                        // lock_guard ではなく unique_lock を使っているので、ここではすでにロックされている。
+                        // getChunk() 内のロックは、この関数外から呼ばれた場合に備えて残す。
+                        auto it = m_chunks.find(neighborCoord);
+                        if (it != m_chunks.end()) {
+                            it->second->setDirty(true);
                         }
                     }
                 }
             }
         }
     }
-    return meshData;
+}
+
+// 不要なチャンクをアンロード（描画距離外に出たチャンク）
+void ChunkManager::unloadDistantChunks(const glm::ivec3 &centerChunkCoord)
+{
+    std::vector<glm::ivec3> chunksToUnload;
+    
+    // m_chunksへの読み取りアクセスなのでロック
+    std::unique_lock<std::mutex> lock(m_chunksMutex); 
+
+    for (auto const &[coord, chunk] : m_chunks)
+    {
+        int dist_x = std::abs(coord.x - centerChunkCoord.x);
+        int dist_y = std::abs(coord.y - centerChunkCoord.y);
+        int dist_z = std::abs(coord.z - centerChunkCoord.z);
+
+        if (dist_x > m_renderDistance || dist_y > m_renderDistance || dist_z > m_renderDistance)
+        {
+            chunksToUnload.push_back(coord);
+        }
+    }
+    
+    // アンロードするチャンクを m_chunks から削除
+    for (const auto &coord : chunksToUnload)
+    {
+        // チャンクがアンロードされるときに、その隣接チャンク（まだ存在する場合）もダーティにする
+        for (int i = 0; i < 6; ++i) {
+            glm::ivec3 offset = neighborOffsets[i];
+            glm::ivec3 neighborCoord = coord + offset;
+            auto it = m_chunks.find(neighborCoord); // ロックされた状態で検索
+            if (it != m_chunks.end()) {
+                it->second->setDirty(true);
+            }
+        }
+
+        // レンダリングデータを削除 (OpenGLリソースの解放はデストラクタで一括か、メインスレッドで行う)
+        // ここではマップからエントリを削除するだけ
+        auto renderDataIt = m_chunkRenderData.find(coord);
+        if (renderDataIt != m_chunkRenderData.end()) {
+             ChunkRenderer::deleteChunkRenderData(renderDataIt->second); // OpenGL リソースを解放
+             m_chunkRenderData.erase(renderDataIt);
+        }
+        
+        m_chunks.erase(coord);
+    }
+} // lock がスコープを抜けるときに解放される
+
+// ワールド座標からチャンク座標を計算します
+glm::ivec3 ChunkManager::getChunkCoordFromWorldPos(const glm::vec3 &worldPos) const
+{
+    int chunkX = static_cast<int>(std::floor(worldPos.x / m_chunkSize));
+    int chunkY = static_cast<int>(std::floor(worldPos.y / m_chunkSize));
+    int chunkZ = static_cast<int>(std::floor(worldPos.z / m_chunkSize));
+    return glm::ivec3(chunkX, chunkY, chunkZ);
+}
+
+// ----- マルチスレッド処理のワーカー関数 -----
+void ChunkManager::meshGenerationWorker() {
+    while (!m_stopWorkers) {
+        glm::ivec3 chunkCoord;
+        std::shared_ptr<Chunk> chunkToMesh = nullptr;
+        
+        { // メッシュ生成キューからタスクを取り出すためのロック
+            std::unique_lock<std::mutex> lock(m_meshGenerationMutex);
+            // キューが空でなく、かつ停止信号が来ていない限り待機
+            m_meshGenerationCondVar.wait(lock, [this] {
+                return !m_meshGenerationQueue.empty() || m_stopWorkers;
+            });
+
+            if (m_stopWorkers) {
+                break; // 停止信号を受け取ったらループを抜ける
+            }
+
+            chunkCoord = m_meshGenerationQueue.front();
+            m_meshGenerationQueue.pop();
+        } // lock がスコープを抜けるときに解放される
+
+        // m_chunks からチャンクオブジェクトを取得 (m_chunksMutex で保護)
+        {
+            std::unique_lock<std::mutex> mapLock(m_chunksMutex);
+            auto it = m_chunks.find(chunkCoord);
+            if (it != m_chunks.end()) {
+                chunkToMesh = it->second;
+            }
+        } // mapLock がスコープを抜けるときに解放される
+
+        if (chunkToMesh) {
+            // メッシュ生成に必要な隣接チャンクの情報を取得する
+            // ここでの getChunk() の呼び出しは、m_chunksMutex で保護されている getChunk() を通して行われる。
+            // しかし、updateChunkMesh 自体はもう直接呼び出さないため、このロジックは
+            // ChunkMeshGenerator::generateMesh に直接必要な引数を渡す形に書き換える。
+            
+            // 隣接チャンクのポインタを取得 (m_chunksMutex で保護)
+            const Chunk* neighbor_neg_x = nullptr;
+            const Chunk* neighbor_pos_x = nullptr;
+            const Chunk* neighbor_neg_y = nullptr;
+            const Chunk* neighbor_pos_y = nullptr;
+            const Chunk* neighbor_neg_z = nullptr;
+            const Chunk* neighbor_pos_z = nullptr;
+
+            {
+                std::unique_lock<std::mutex> mapLock(m_chunksMutex); // m_chunksへのアクセスを保護
+                neighbor_neg_x = getChunk(glm::ivec3(chunkCoord.x - 1, chunkCoord.y, chunkCoord.z)).get();
+                neighbor_pos_x = getChunk(glm::ivec3(chunkCoord.x + 1, chunkCoord.y, chunkCoord.z)).get();
+                neighbor_neg_y = getChunk(glm::ivec3(chunkCoord.x, chunkCoord.y - 1, chunkCoord.z)).get();
+                neighbor_pos_y = getChunk(glm::ivec3(chunkCoord.x, chunkCoord.y + 1, chunkCoord.z)).get();
+                neighbor_neg_z = getChunk(glm::ivec3(chunkCoord.x, chunkCoord.y, chunkCoord.z - 1)).get();
+                neighbor_pos_z = getChunk(glm::ivec3(chunkCoord.x, chunkCoord.y, chunkCoord.z + 1)).get();
+            } // mapLock がスコープを抜けるときに解放される
+
+            // メッシュ生成 (計算負荷は高いが、m_chunksを変更しないため、ここではロック不要)
+            ChunkMeshData meshData = ChunkMeshGenerator::generateMesh(
+                *chunkToMesh,
+                neighbor_neg_x, neighbor_pos_x,
+                neighbor_neg_y, neighbor_pos_y,
+                neighbor_neg_z, neighbor_pos_z
+            );
+
+            { // 生成されたメッシュデータを完了キューに追加
+                std::unique_lock<std::mutex> lock(m_completedMeshesMutex);
+                m_completedMeshes.push({chunkCoord, meshData});
+                m_completedMeshesCondVar.notify_one(); // メインスレッドに完了を通知
+            }
+        } else {
+            // チャンクがメッシュ生成キューから取り出された時点で既にアンロードされていた場合
+            // (プレイヤーが移動して描画距離外に出たなど)
+            // 何もせずスキップ
+            // std::cout << "Warning: Chunk " << chunkCoord.x << "," << chunkCoord.y << "," << chunkCoord.z << " not found for mesh generation." << std::endl;
+        }
+    }
+}
+
+// メインスレッドで完了したメッシュデータを処理し、OpenGLリソースを更新します
+void ChunkManager::processCompletedMeshes() {
+    std::unique_lock<std::mutex> lock(m_completedMeshesMutex);
+    while (!m_completedMeshes.empty()) {
+        std::pair<glm::ivec3, ChunkMeshData> completedMesh = m_completedMeshes.front();
+        m_completedMeshes.pop();
+        lock.unlock(); // OpenGL呼び出し中はミューテックスを解放
+
+        // 古いレンダリングデータが存在する場合は解放
+        auto it = m_chunkRenderData.find(completedMesh.first);
+        if (it != m_chunkRenderData.end()) {
+            ChunkRenderer::deleteChunkRenderData(it->second);
+        }
+        
+        // 新しいレンダリングデータを生成し、保存
+        // ChunkRenderer::createChunkRenderData は OpenGL 呼び出しを含むため、メインスレッドで行う
+        m_chunkRenderData[completedMesh.first] = ChunkRenderer::createChunkRenderData(completedMesh.second);
+
+        lock.lock(); // 次のメッシュ処理のためにミューテックスを再取得
+    }
 }
