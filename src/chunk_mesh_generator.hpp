@@ -6,7 +6,7 @@
 #include <array>
 #include <glm/glm.hpp>
 
-#include "chunk/chunk.hpp"
+#include "chunk/chunk.hpp" // <-- 追加: Chunkクラスの定義のため
 
 struct Vertex
 {
@@ -43,7 +43,7 @@ public:
                                       const Chunk* neighbor_pos_y = nullptr,
                                       const Chunk* neighbor_neg_z = nullptr,
                                       const Chunk* neighbor_pos_z = nullptr
-                                      );
+                                     );
 };
 
 #endif // CHUNK_MESH_GENERATOR_HPP

@@ -10,7 +10,7 @@ ChunkManager::ChunkManager(int chunkSize, int renderDistanceXZ, unsigned int noi
                            int worldMaxHeight, int groundLevel, int octaves, float lacunarity, float persistence)
     : m_chunkSize(chunkSize), m_renderDistance(renderDistanceXZ),
       m_terrainGenerator(std::make_unique<TerrainGenerator>(noiseSeed, noiseScale, worldMaxHeight, groundLevel,
-                                                             octaves, lacunarity, persistence)),
+                                                            octaves, lacunarity, persistence)),
       m_lastPlayerChunkCoord(std::numeric_limits<int>::max())
 {
     std::cout << "ChunkManager constructor called. ChunkSize: " << m_chunkSize
@@ -66,8 +66,7 @@ std::shared_ptr<Chunk> ChunkManager::getChunk(const glm::ivec3 &chunkCoord)
 // チャンクを生成して初期化（ボクセルデータを一括設定）
 std::shared_ptr<Chunk> ChunkManager::generateChunk(const glm::ivec3 &chunkCoord)
 {
-    std::shared_ptr<Chunk> newChunk = std::make_shared<Chunk>(m_chunkSize);
-
+    std::shared_ptr<Chunk> newChunk = std::make_shared<Chunk>(m_chunkSize, chunkCoord);
     if (!m_terrainGenerator)
     {
         std::cerr << "Error: TerrainGenerator instance is not initialized in ChunkManager.\n";
@@ -121,21 +120,20 @@ std::shared_ptr<Chunk> ChunkManager::generateChunk(const glm::ivec3 &chunkCoord)
 void ChunkManager::updateChunkMesh(const glm::ivec3 &chunkCoord, std::shared_ptr<Chunk> chunk)
 {
     // 隣接チャンクを取得
-    const Chunk* neighbor_neg_x = getChunk(glm::ivec3(chunkCoord.x - 1, chunkCoord.y, chunkCoord.z)).get();
-    const Chunk* neighbor_pos_x = getChunk(glm::ivec3(chunkCoord.x + 1, chunkCoord.y, chunkCoord.z)).get();
-    const Chunk* neighbor_neg_y = getChunk(glm::ivec3(chunkCoord.x, chunkCoord.y - 1, chunkCoord.z)).get();
-    const Chunk* neighbor_pos_y = getChunk(glm::ivec3(chunkCoord.x, chunkCoord.y + 1, chunkCoord.z)).get();
-    const Chunk* neighbor_neg_z = getChunk(glm::ivec3(chunkCoord.x, chunkCoord.y, chunkCoord.z - 1)).get();
-    const Chunk* neighbor_pos_z = getChunk(glm::ivec3(chunkCoord.x, chunkCoord.y, chunkCoord.z + 1)).get();
-    
+    const Chunk *neighbor_neg_x = getChunk(glm::ivec3(chunkCoord.x - 1, chunkCoord.y, chunkCoord.z)).get();
+    const Chunk *neighbor_pos_x = getChunk(glm::ivec3(chunkCoord.x + 1, chunkCoord.y, chunkCoord.z)).get();
+    const Chunk *neighbor_neg_y = getChunk(glm::ivec3(chunkCoord.x, chunkCoord.y - 1, chunkCoord.z)).get();
+    const Chunk *neighbor_pos_y = getChunk(glm::ivec3(chunkCoord.x, chunkCoord.y + 1, chunkCoord.z)).get();
+    const Chunk *neighbor_neg_z = getChunk(glm::ivec3(chunkCoord.x, chunkCoord.y, chunkCoord.z - 1)).get();
+    const Chunk *neighbor_pos_z = getChunk(glm::ivec3(chunkCoord.x, chunkCoord.y, chunkCoord.z + 1)).get();
+
     // ChunkMeshGenerator を使用してメッシュデータを生成します
     // 隣接チャンクのポインタを渡す
     ChunkMeshData meshData = ChunkMeshGenerator::generateMesh(
         *chunk,
         neighbor_neg_x, neighbor_pos_x,
         neighbor_neg_y, neighbor_pos_y,
-        neighbor_neg_z, neighbor_pos_z
-    );
+        neighbor_neg_z, neighbor_pos_z);
 
     // レンダリングデータを更新します
     m_chunkRenderData[chunkCoord] = ChunkRenderer::createChunkRenderData(meshData);
@@ -156,13 +154,15 @@ void ChunkManager::loadChunksInArea(const glm::ivec3 &centerChunkCoord)
                 {
                     std::shared_ptr<Chunk> newChunk = generateChunk(currentChunkCoord);
                     m_chunks[currentChunkCoord] = newChunk;
-                    
+
                     // 新しいチャンクがロードされたときに、その隣接チャンク（既に存在する場合）もダーティにする
-                    for (int i = 0; i < 6; ++i) {
+                    for (int i = 0; i < 6; ++i)
+                    {
                         glm::ivec3 offset = neighborOffsets[i];
                         glm::ivec3 neighborCoord = currentChunkCoord + offset;
                         std::shared_ptr<Chunk> neighborChunk = getChunk(neighborCoord);
-                        if (neighborChunk) {
+                        if (neighborChunk)
+                        {
                             neighborChunk->setDirty(true);
                         }
                     }
@@ -191,11 +191,13 @@ void ChunkManager::unloadDistantChunks(const glm::ivec3 &centerChunkCoord)
     for (const auto &coord : chunksToUnload)
     {
         // チャンクがアンロードされるときに、その隣接チャンク（まだ存在する場合）もダーティにする
-        for (int i = 0; i < 6; ++i) {
+        for (int i = 0; i < 6; ++i)
+        {
             glm::ivec3 offset = neighborOffsets[i];
             glm::ivec3 neighborCoord = coord + offset;
             std::shared_ptr<Chunk> neighborChunk = getChunk(neighborCoord);
-            if (neighborChunk) {
+            if (neighborChunk)
+            {
                 neighborChunk->setDirty(true);
             }
         }

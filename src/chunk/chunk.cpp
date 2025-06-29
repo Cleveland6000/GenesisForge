@@ -1,7 +1,10 @@
 #include "chunk.hpp"
 #include <stdexcept>
+#include <glm/glm.hpp> // glm::ivec3 のために追加
 
-Chunk::Chunk(int size) : m_size(size), m_isDirty(true)
+// コンストラクタにcoordパラメータを追加し、m_coordを初期化
+Chunk::Chunk(int size, const glm::ivec3& coord) 
+    : m_size(size), m_isDirty(true), m_coord(coord) // m_coord を初期化
 {
     if (size <= 0)
     {
