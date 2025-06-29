@@ -1,25 +1,33 @@
 #version 330 core
 out vec4 FragColor;
 
-in vec3 ourColor; // 頂点シェーダーから受け取る色 (今回は使用しない)
-in vec2 TexCoord; // 頂点シェーダーから受け取るテクスチャ座標
-in vec3 Normal; // ワールド空間の法線を受け取る
+in vec3 ourColor;
+in vec2 TexCoord;
+in vec3 Normal;
+in float AO; // 頂点シェーダーから受け取るAO値
 
-uniform sampler2D ourTexture; // テクスチャサンプラー
-uniform vec3 lightDir; // 光源の方向 (正規化されていると仮定)
-uniform float ambientStrength; // 環境光の強さ (0.0から1.0)
+uniform sampler2D ourTexture;
+uniform vec3 lightDir;
+uniform float ambientStrength;
 
 void main()
 {
-    vec3 texColor = texture(ourTexture, TexCoord).rgb; // テクスチャの色を取得
+    vec3 texColor = texture(ourTexture, TexCoord).rgb;
 
-    // 環境光 (Ambient Light)
-    vec3 ambient = ambientStrength * texColor;
+    // AO値を0-1の範囲に正規化し、非線形に変換して環境光に適用
+    // pow(x, 2.0) を使用することで、AOが低い（影が濃い）場合に、より強く環境光を減衰させます。
+    // AO = 0 -> 0.0 (最も暗い)
+    // AO = 1 -> (1/3)^2 = 約0.11
+    // AO = 2 -> (2/3)^2 = 約0.44
+    // AO = 3 -> 1.0 (最も明るい)
+    float ambientOcclusionFactor = pow(AO / 3.0, 2.0); // ここを変更
+
+    // 環境光 (Ambient Light) にAOを適用
+    vec3 ambient = ambientStrength * texColor * ambientOcclusionFactor;
 
     // 拡散反射光 (Diffuse Light)
-    // 法線と光源方向の内積を計算。面が光源と反対を向いている場合は0にする
-    float diff = max(dot(Normal, -lightDir), 0.0); // 光源方向を反転 (-lightDir)
-    vec3 diffuse = diff * texColor; // テクスチャの色に拡散反射光を適用
+    float diff = max(dot(Normal, -lightDir), 0.0);
+    vec3 diffuse = diff * texColor;
 
     // 最終的な色を計算 (環境光 + 拡散反射光)
     FragColor = vec4(ambient + diffuse, 1.0);
