@@ -45,9 +45,10 @@ const std::array<glm::vec2, 4> faceUVs = {
     glm::vec2(0.0f, 1.0f)  // 左上
 };
 
-
-inline size_t getVoxelIndex(int x, int y, int z, int chunkSize) {
-    if (x < 0 || x >= chunkSize || y < 0 || y >= chunkSize || z < 0 || z >= chunkSize) {
+inline size_t getVoxelIndex(int x, int y, int z, int chunkSize)
+{
+    if (x < 0 || x >= chunkSize || y < 0 || y >= chunkSize || z < 0 || z >= chunkSize)
+    {
         // 範囲外のアクセスは安全な値を返す
         return std::numeric_limits<size_t>::max(); // 無効なインデックス
     }
@@ -57,10 +58,11 @@ inline size_t getVoxelIndex(int x, int y, int z, int chunkSize) {
 // 特定のボクセルの隣接ボクセルを取得するヘルパー関数
 // 隣接チャンクも考慮する
 bool isVoxelSolid(int x, int y, int z, int chunkSize,
-                  const Chunk& currentChunk,
-                  const Chunk* neighbor_neg_x, const Chunk* neighbor_pos_x,
-                  const Chunk* neighbor_neg_y, const Chunk* neighbor_pos_y,
-                  const Chunk* neighbor_neg_z, const Chunk* neighbor_pos_z) {
+                  const Chunk &currentChunk,
+                  const Chunk *neighbor_neg_x, const Chunk *neighbor_pos_x,
+                  const Chunk *neighbor_neg_y, const Chunk *neighbor_pos_y,
+                  const Chunk *neighbor_neg_z, const Chunk *neighbor_pos_z)
+{
 
     if (x >= 0 && x < chunkSize &&
         y >= 0 && y < chunkSize &&
@@ -71,35 +73,47 @@ bool isVoxelSolid(int x, int y, int z, int chunkSize,
     }
     else // 隣接チャンクのボクセル
     {
-        const Chunk* targetChunk = nullptr;
+        const Chunk *targetChunk = nullptr;
         int targetX = x;
         int targetY = y;
         int targetZ = z;
 
-        if (x < 0) {
+        if (x < 0)
+        {
             targetChunk = neighbor_neg_x;
             targetX = chunkSize + x; // xは負なので、chunkSize - |x| と同じ
-        } else if (x >= chunkSize) {
+        }
+        else if (x >= chunkSize)
+        {
             targetChunk = neighbor_pos_x;
             targetX = x - chunkSize;
-        } else if (y < 0) {
+        }
+        else if (y < 0)
+        {
             targetChunk = neighbor_neg_y;
             targetY = chunkSize + y;
-        } else if (y >= chunkSize) {
+        }
+        else if (y >= chunkSize)
+        {
             targetChunk = neighbor_pos_y;
             targetY = 0; // y-1 -> チャンクの最上段のセル
-        } else if (z < 0) {
+        }
+        else if (z < 0)
+        {
             targetChunk = neighbor_neg_z;
             targetZ = chunkSize + z;
-        } else if (z >= chunkSize) {
+        }
+        else if (z >= chunkSize)
+        {
             targetChunk = neighbor_pos_z;
             targetZ = z - chunkSize;
         }
-        
-        if (targetChunk != nullptr && 
+
+        if (targetChunk != nullptr &&
             targetX >= 0 && targetX < chunkSize &&
             targetY >= 0 && targetY < chunkSize &&
-            targetZ >= 0 && targetZ < chunkSize) {
+            targetZ >= 0 && targetZ < chunkSize)
+        {
             return targetChunk->getVoxels()[getVoxelIndex(targetX, targetY, targetZ, chunkSize)];
         }
     }
@@ -109,14 +123,15 @@ bool isVoxelSolid(int x, int y, int z, int chunkSize,
 // 頂点ごとのアンビエントオクルージョンを計算するヘルパー関数
 // 参考: https://0fps.net/2013/07/07/meshing-in-a-minecraft-game/
 float getAmbientOcclusion(int x, int y, int z, int chunkSize,
-                          const Chunk& currentChunk,
-                          const Chunk* neighbor_neg_x, const Chunk* neighbor_pos_x,
-                          const Chunk* neighbor_neg_y, const Chunk* neighbor_pos_y,
-                          const Chunk* neighbor_neg_z, const Chunk* neighbor_pos_z,
+                          const Chunk &currentChunk,
+                          const Chunk *neighbor_neg_x, const Chunk *neighbor_pos_x,
+                          const Chunk *neighbor_neg_y, const Chunk *neighbor_pos_y,
+                          const Chunk *neighbor_neg_z, const Chunk *neighbor_pos_z,
                           float cornerDX, float cornerDY, float cornerDZ, // 頂点のボクセル内相対座標 (0.0f or 1.0f)
-                          int faceIndex // 面のインデックス (0-5)
-                          ) {
-    
+                          int faceIndex                                   // 面のインデックス (0-5)
+)
+{
+
     // (x, y, z) は現在処理中のボクセルのローカル座標
     // (cornerDX, cornerDY, cornerDZ) は、そのボクセルから見た現在の頂点の相対座標 (0.0f or 1.0f)
     // 例えば、ボクセル(5,5,5) の右手前上の頂点 (5+1.0, 5+1.0, 5+1.0) のAOを計算したい場合
@@ -124,39 +139,43 @@ float getAmbientOcclusion(int x, int y, int z, int chunkSize,
 
     // 0fps のAO計算ロジックを忠実に再現します。
     // 各面の各頂点において、その頂点に隣接する3つの「影響を与えるボクセル」をチェックする方式。
-    
+
     int side1_dx = 0, side1_dy = 0, side1_dz = 0;
     int side2_dx = 0, side2_dy = 0, side2_dz = 0;
     int corner_dx = 0, corner_dy = 0, corner_dz = 0;
 
     // 面の法線方向 (faceIndex) と頂点の相対位置 (cornerDX, cornerDY, cornerDZ) に応じて、
     // チェックする3つのボクセルを決定します。
-    
+
     // X- 面 (左) のAO (Normal: (-1, 0, 0))
-    if (faceIndex == 2) { 
+    if (faceIndex == 2)
+    {
         side1_dy = (cornerDY == 0.0f) ? -1 : 1; // Y方向の隣接ボクセル
         side2_dz = (cornerDZ == 0.0f) ? -1 : 1; // Z方向の隣接ボクセル
         corner_dy = side1_dy;
         corner_dz = side2_dz;
     }
     // X+ 面 (右) のAO (Normal: (1, 0, 0))
-    else if (faceIndex == 3) {
+    else if (faceIndex == 3)
+    {
         // 現在のボクセル座標xに対して、隣接ボクセルは常にx+1の方向にある
-        x = x + 1; 
+        x = x + 1;
         side1_dy = (cornerDY == 0.0f) ? -1 : 1;
         side2_dz = (cornerDZ == 0.0f) ? -1 : 1;
         corner_dy = side1_dy;
         corner_dz = side2_dz;
     }
     // Y- 面 (底) のAO (Normal: (0, -1, 0))
-    else if (faceIndex == 4) {
+    else if (faceIndex == 4)
+    {
         side1_dx = (cornerDX == 0.0f) ? -1 : 1;
         side2_dz = (cornerDZ == 0.0f) ? -1 : 1;
         corner_dx = side1_dx;
         corner_dz = side2_dz;
     }
     // Y+ 面 (上) のAO (Normal: (0, 1, 0))
-    else if (faceIndex == 5) {
+    else if (faceIndex == 5)
+    {
         // 現在のボクセル座標yに対して、隣接ボクセルは常にy+1の方向にある
         y = y + 1;
         side1_dx = (cornerDX == 0.0f) ? -1 : 1;
@@ -165,14 +184,16 @@ float getAmbientOcclusion(int x, int y, int z, int chunkSize,
         corner_dz = side2_dz;
     }
     // Z- 面 (奥) のAO (Normal: (0, 0, -1))
-    else if (faceIndex == 0) {
+    else if (faceIndex == 0)
+    {
         side1_dx = (cornerDX == 0.0f) ? -1 : 1;
         side2_dy = (cornerDY == 0.0f) ? -1 : 1;
         corner_dx = side1_dx;
         corner_dy = side2_dy;
     }
     // Z+ 面 (手前) のAO (Normal: (0, 0, 1))
-    else if (faceIndex == 1) {
+    else if (faceIndex == 1)
+    {
         // 現在のボクセル座標zに対して、隣接ボクセルは常にz+1の方向にある
         z = z + 1;
         side1_dx = (cornerDX == 0.0f) ? -1 : 1;
@@ -188,35 +209,38 @@ float getAmbientOcclusion(int x, int y, int z, int chunkSize,
 
     // 0fps のAO値を計算
     // 3つのボクセルが全て埋まっている場合
-    if (side1_solid && side2_solid && corner_solid) {
+    if (side1_solid && side2_solid && corner_solid)
+    {
         return 0.0f; // 最も暗い
     }
     // 2つのボクセルが埋まっている場合
-    else if ((side1_solid && side2_solid) || (side1_solid && corner_solid) || (side2_solid && corner_solid)) {
+    else if ((side1_solid && side2_solid) || (side1_solid && corner_solid) || (side2_solid && corner_solid))
+    {
         return 1.0f;
     }
     // 1つのボクセルが埋まっている場合
-    else if (side1_solid || side2_solid || corner_solid) {
+    else if (side1_solid || side2_solid || corner_solid)
+    {
         return 2.0f;
     }
     // 全て空の場合
-    else {
+    else
+    {
         return 3.0f; // 最も明るい
     }
 }
 
-
 ChunkMeshData ChunkMeshGenerator::generateMesh(const Chunk &chunk,
-                                              const Chunk* neighbor_neg_x,
-                                              const Chunk* neighbor_pos_x,
-                                              const Chunk* neighbor_neg_y,
-                                              const Chunk* neighbor_pos_y,
-                                              const Chunk* neighbor_neg_z,
-                                              const Chunk* neighbor_pos_z)
+                                               const Chunk *neighbor_neg_x,
+                                               const Chunk *neighbor_pos_x,
+                                               const Chunk *neighbor_neg_y,
+                                               const Chunk *neighbor_pos_y,
+                                               const Chunk *neighbor_neg_z,
+                                               const Chunk *neighbor_pos_z)
 {
     ChunkMeshData meshData;
     int chunkSize = chunk.getSize();
-    const std::vector<bool>& voxels = chunk.getVoxels();
+    const std::vector<bool> &voxels = chunk.getVoxels();
 
     meshData.vertices.reserve(chunkSize * chunkSize * chunkSize * 4 * 6);
     meshData.indices.reserve(chunkSize * chunkSize * chunkSize * 6 * 6);
@@ -238,54 +262,16 @@ ChunkMeshData ChunkMeshGenerator::generateMesh(const Chunk &chunk,
                         int neighborY = y + offset.y;
                         int neighborZ = z + offset.z;
 
+                        // isVoxelSolid 関数が隣接チャンクのチェックを全て処理するため、
+                        // 複雑な条件分岐は不要になります。
                         bool renderFace = true;
-
-                        // 隣接ボクセルが現在のチャンク内にあるかチェック
-                        if (neighborX >= 0 && neighborX < chunkSize &&
-                            neighborY >= 0 && neighborY < chunkSize &&
-                            neighborZ >= 0 && neighborZ < chunkSize)
+                        if (isVoxelSolid(neighborX, neighborY, neighborZ, chunkSize,
+                                         chunk,
+                                         neighbor_neg_x, neighbor_pos_x,
+                                         neighbor_neg_y, neighbor_pos_y,
+                                         neighbor_neg_z, neighbor_pos_z))
                         {
-                            // 現在のチャンク内に隣接ボクセルがある場合
-                            if (voxels[getVoxelIndex(neighborX, neighborY, neighborZ, chunkSize)])
-                            {
-                                renderFace = false; // 隣接ボクセルがあるので、この面は不要
-                            }
-                        }
-                        else // 隣接ボクセルが現在のチャンクの境界外にある場合 (つまり、隣接チャンク内か世界の端)
-                        {
-                            const Chunk* adjacentChunk = nullptr;
-                            int relativeNeighborX = neighborX; // 隣接チャンク内での相対座標
-                            int relativeNeighborY = neighborY;
-                            int relativeNeighborZ = neighborZ;
-
-                            if (offset.x == -1) {
-                                adjacentChunk = neighbor_neg_x;
-                                relativeNeighborX = chunkSize - 1;
-                            } else if (offset.x == 1) {
-                                adjacentChunk = neighbor_pos_x;
-                                relativeNeighborX = 0;
-                            } else if (offset.y == -1) {
-                                adjacentChunk = neighbor_neg_y;
-                                relativeNeighborY = chunkSize - 1;
-                            } else if (offset.y == 1) {
-                                adjacentChunk = neighbor_pos_y;
-                                relativeNeighborY = 0;
-                            } else if (offset.z == -1) {
-                                adjacentChunk = neighbor_neg_z;
-                                relativeNeighborZ = chunkSize - 1;
-                            } else if (offset.z == 1) {
-                                adjacentChunk = neighbor_pos_z;
-                                relativeNeighborZ = 0;
-                            }
-                            
-                            if (adjacentChunk != nullptr && 
-                                relativeNeighborX >= 0 && relativeNeighborX < chunkSize &&
-                                relativeNeighborY >= 0 && relativeNeighborY < chunkSize &&
-                                relativeNeighborZ >= 0 && relativeNeighborZ < chunkSize) {
-                                if (adjacentChunk->getVoxels()[getVoxelIndex(relativeNeighborX, relativeNeighborY, relativeNeighborZ, chunkSize)]) {
-                                    renderFace = false;
-                                }
-                            }
+                            renderFace = false; // 隣接ボクセルがソリッドなので、この面は描画不要
                         }
 
                         if (renderFace)
@@ -310,15 +296,13 @@ ChunkMeshData ChunkMeshGenerator::generateMesh(const Chunk &chunk,
                                 newVertex.nz = currentFaceNormal.z;
 
                                 // AO値を計算して設定
-                                // baseVertex.x, baseVertex.y, baseVertex.z はボクセル内の相対頂点位置 (0.0 or 1.0)
-                                newVertex.ao = getAmbientOcclusion(x, y, z, chunkSize, 
-                                                                 chunk, 
-                                                                 neighbor_neg_x, neighbor_pos_x,
-                                                                 neighbor_neg_y, neighbor_pos_y,
-                                                                 neighbor_neg_z, neighbor_pos_z,
-                                                                 baseVertex.x, baseVertex.y, baseVertex.z, // 頂点の相対位置を渡す
-                                                                 i // 面のインデックスも渡す
-                                                                 );
+                                newVertex.ao = getAmbientOcclusion(x, y, z, chunkSize,
+                                                                   chunk,
+                                                                   neighbor_neg_x, neighbor_pos_x,
+                                                                   neighbor_neg_y, neighbor_pos_y,
+                                                                   neighbor_neg_z, neighbor_pos_z,
+                                                                   baseVertex.x, baseVertex.y, baseVertex.z,
+                                                                   i);
 
                                 meshData.vertices.push_back(newVertex);
                             }
