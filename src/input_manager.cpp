@@ -7,7 +7,9 @@ InputManager::InputManager(Camera& camera)
 void InputManager::setWindow(GLFWwindow* window) {
     m_window = window;
     if (m_window) {
-        glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        // カーソルを非表示にし、中心に固定する
+        glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED); 
+
         int width, height;
         glfwGetWindowSize(m_window, &width, &height);
         m_lastX = static_cast<float>(width) / 2.0f;
@@ -43,7 +45,6 @@ void InputManager::processMouseMovement(double xposIn, double yposIn) {
     m_lastY = ypos;
 
     // カメラにマウス移動を伝える
-    // ここを修正: 'ProcessMouseMovement' を 'processMouseMovement' に変更
     m_camera.processMouseMovement(xoffset, yoffset); 
 }
 

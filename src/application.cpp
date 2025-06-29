@@ -37,6 +37,9 @@ bool Application::initialize()
         return false;
     }
 
+    // ここにウィンドウを最大化するコードを追加します
+    glfwMaximizeWindow(m_windowContext->getWindow());
+
     m_inputManager->setWindow(m_windowContext->getWindow());
 
     if (!m_fontLoader->loadSDFont("../assets/fonts/NotoSansJP-VariableFont_wght.json",
