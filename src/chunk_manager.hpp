@@ -40,7 +40,6 @@ private:
     int m_renderDistance;
 
     std::unique_ptr<TerrainGenerator> m_terrainGenerator;
-
     std::unordered_map<glm::ivec3, std::shared_ptr<Chunk>, Vec3iHash> m_chunks;
     std::unordered_map<glm::ivec3, ChunkRenderData, Vec3iHash> m_chunkRenderData;
 
@@ -49,6 +48,7 @@ private:
     void loadChunksInArea(const glm::ivec3 &centerChunkCoord);
     void unloadDistantChunks(const glm::ivec3 &centerChunkCoord);
     glm::ivec3 getChunkCoordFromWorldPos(const glm::vec3 &worldPos) const;
+    glm::ivec3 m_lastPlayerChunkCoord; // 前回のプレイヤーのチャンク座標
 };
 
 #endif // CHUNK_MANAGER_HPP

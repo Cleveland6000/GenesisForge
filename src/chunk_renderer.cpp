@@ -6,7 +6,7 @@ ChunkRenderData ChunkRenderer::createChunkRenderData(const ChunkMeshData& meshDa
     ChunkRenderData renderData;
 
     if (meshData.vertices.empty() || meshData.indices.empty()) {
-        std::cerr << "Warning: Attempted to create ChunkRenderData from empty mesh data.\n";
+        //std::cerr << "Warning: Attempted to create ChunkRenderData from empty mesh data.\n";
         return renderData; // 空のデータオブジェクトを返す
     }
 
