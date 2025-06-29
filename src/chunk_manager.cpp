@@ -44,7 +44,7 @@ void ChunkManager::update(const glm::vec3 &playerPosition)
     else
     {
         // チャンク座標が変わらない場合でもロードは確認します (hasChunkで重複は防がれます)
-        loadChunksInArea(currentChunkCoord);
+        //loadChunksInArea(currentChunkCoord);
     }
 
     // ダーティなチャンク（内容が変更されたチャンク）のメッシュを更新します
