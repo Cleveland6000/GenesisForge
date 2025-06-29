@@ -28,7 +28,7 @@ const std::array<std::array<unsigned int, 4>, 6> cubeFaceBaseIndices = {
     std::array<unsigned int, 4>{0, 3, 2, 1},
 
     // 1: Front face (Z+): 法線(0,0,1)
-    // 外側から見てCCW: 6, 5, 4, 7 (左下、右下、右上、左上) -- ここを修正しました
+    // 外側から見てCCW: 6, 5, 4, 7 (左下、右下、右上、左上)
     std::array<unsigned int, 4>{6, 5, 4, 7},
 
     // 2: Left face (X-): 法線(-1,0,0)
@@ -65,11 +65,13 @@ inline size_t getVoxelIndex(int x, int y, int z, int chunkSize) {
     return static_cast<size_t>(x + y * chunkSize + z * chunkSize * chunkSize);
 }
 
-ChunkMeshData ChunkMeshGenerator::generateMesh(const Chunk &chunk)
+// generateMesh のシグネチャ変更
+ChunkMeshData ChunkMeshGenerator::generateMesh(const Chunk &currentChunk, 
+                                                 const std::array<const Chunk*, 6>& adjacentChunks)
 {
     ChunkMeshData meshData;
-    int chunkSize = chunk.getSize();
-    const std::vector<bool>& voxels = chunk.getVoxels(); // ボクセルデータを直接取得
+    int chunkSize = currentChunk.getSize();
+    const std::vector<bool>& voxels = currentChunk.getVoxels(); // 現在のチャンクのボクセルデータを直接取得
 
     // 最適化: 事前にベクタの容量を予約
     meshData.vertices.reserve(chunkSize * chunkSize * chunkSize * 4 * 6);
@@ -95,15 +97,35 @@ ChunkMeshData ChunkMeshGenerator::generateMesh(const Chunk &chunk)
                         int neighborZ = z + offset.z;
 
                         bool renderFace = true;
-                        // 隣接するボクセルがチャンク内にあるか、かつ不透明な場合、面は描画しない
+                        
+                        // 隣接ボクセルが現在のチャンク内にあるかチェック
                         if (neighborX >= 0 && neighborX < chunkSize &&
                             neighborY >= 0 && neighborY < chunkSize &&
                             neighborZ >= 0 && neighborZ < chunkSize)
                         {
-                            // getVoxelの代わりに直接voxels配列にアクセス
+                            // チャンク内の隣接ボクセルが不透明な場合、面は描画しない
                             if (voxels[getVoxelIndex(neighborX, neighborY, neighborZ, chunkSize)])
                             {
                                 renderFace = false;
+                            }
+                        }
+                        // 隣接ボクセルが現在のチャンクの境界外（隣接チャンク内）にある場合
+                        else 
+                        {
+                            const Chunk* adjChunk = adjacentChunks[i];
+                            if (adjChunk != nullptr)
+                            {
+                                // 隣接チャンクのローカル座標に変換
+                                // 例: x=0のチャンクの-1方向の隣接は、x=chunkSize-1の隣接チャンクに相当
+                                int adj_x = (x + offset.x + chunkSize) % chunkSize;
+                                int adj_y = (y + offset.y + chunkSize) % chunkSize;
+                                int adj_z = (z + offset.z + chunkSize) % chunkSize;
+
+                                // 隣接チャンクのボクセルをチェック
+                                if (adjChunk->getVoxel(adj_x, adj_y, adj_z)) 
+                                {
+                                    renderFace = false;
+                                }
                             }
                         }
 
@@ -115,7 +137,7 @@ ChunkMeshData ChunkMeshGenerator::generateMesh(const Chunk &chunk)
                             {
                                 Vertex baseVertex = baseCubeVertices[baseIdx];
                                 Vertex newVertex = baseVertex;
-                                // ボクセル位置にオフセットを適用し、間隔を考慮
+                                // ボクセル位置にオフセットを適用
                                 newVertex.x += x;
                                 newVertex.y += y;
                                 newVertex.z += z;
