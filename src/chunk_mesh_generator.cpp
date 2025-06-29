@@ -96,7 +96,7 @@ bool isVoxelSolid(int x, int y, int z, int chunkSize,
         else if (y >= chunkSize)
         {
             targetChunk = neighbor_pos_y;
-            targetY = y - chunkSize; 
+            targetY = y - chunkSize;
         }
         else if (z < 0)
         {
@@ -226,21 +226,20 @@ ChunkMeshData ChunkMeshGenerator::generateMesh(const Chunk &chunk,
 
     // チャンクのワールド座標を取得（ChunkクラスにgetCoord()メソッドがあると仮定）
     // もしChunkクラスにgetCoord()がない場合は、引数として渡すか、別の方法でチャンクのユニークな識別子を取得してください。
-    glm::ivec3 chunkCoord = chunk.getCoord(); 
-    
+    glm::ivec3 chunkCoord = chunk.getCoord();
+
     // チャンクの座標をシードとして使用することで、同じチャンクは常に同じ乱数パターンを生成します。
     // 座標が負になる可能性があるので、大きな素数で乗算して衝突を減らします。
     std::seed_seq seed_seq{
         static_cast<std::uint32_t>(chunkCoord.x),
         static_cast<std::uint32_t>(chunkCoord.y),
-        static_cast<std::uint32_t>(chunkCoord.z)
-    };
+        static_cast<std::uint32_t>(chunkCoord.z)};
     std::mt19937 rng(seed_seq);
-    
+
     // 回転用: 0=0deg, 1=90deg, 2=180deg, 3=270deg
-    std::uniform_int_distribution<int> rotation_dist(0, 3); 
+    std::uniform_int_distribution<int> rotation_dist(0, 3);
     // 反転用: 0=反転なし, 1=水平反転
-    std::uniform_int_distribution<int> flip_dist(0, 1); 
+    std::uniform_int_distribution<int> flip_dist(0, 1);
 
     meshData.vertices.reserve(chunkSize * chunkSize * chunkSize * 4 * 6);
     meshData.indices.reserve(chunkSize * chunkSize * chunkSize * 6 * 6);
@@ -298,23 +297,25 @@ ChunkMeshData ChunkMeshGenerator::generateMesh(const Chunk &chunk,
                                 glm::vec2 uv = faceUVs[v_idx];
 
                                 // まず回転を適用
-                                switch (rotationAmount) {
-                                    case 1: // 90度回転 (反時計回り)
-                                        uv = glm::vec2(1.0f - uv.y, uv.x);
-                                        break;
-                                    case 2: // 180度回転
-                                        uv = glm::vec2(1.0f - uv.x, 1.0f - uv.y);
-                                        break;
-                                    case 3: // 270度回転 (反時計回り)
-                                        uv = glm::vec2(uv.y, 1.0f - uv.x);
-                                        break;
-                                    default: // 0度回転 (case 0)
-                                        // 何もしない
-                                        break;
+                                switch (rotationAmount)
+                                {
+                                case 1: // 90度回転 (反時計回り)
+                                    uv = glm::vec2(1.0f - uv.y, uv.x);
+                                    break;
+                                case 2: // 180度回転
+                                    uv = glm::vec2(1.0f - uv.x, 1.0f - uv.y);
+                                    break;
+                                case 3: // 270度回転 (反時計回り)
+                                    uv = glm::vec2(uv.y, 1.0f - uv.x);
+                                    break;
+                                default: // 0度回転 (case 0)
+                                    // 何もしない
+                                    break;
                                 }
 
                                 // 次に水平反転を適用 (U座標のみ反転)
-                                if (flipHorizontal) {
+                                if (flipHorizontal)
+                                {
                                     uv.x = 1.0f - uv.x;
                                 }
                                 // 必要であれば垂直反転 (uv.y = 1.0f - uv.y;) も追加可能
