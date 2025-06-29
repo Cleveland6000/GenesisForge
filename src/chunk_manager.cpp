@@ -6,13 +6,13 @@
 // コンストラクタ: renderDistanceXZ と renderDistanceY を受け取るように変更
 ChunkManager::ChunkManager(int chunkSize, int renderDistanceXZ, unsigned int noiseSeed, float noiseScale,
                            int worldMaxHeight, int groundLevel, int octaves, float lacunarity, float persistence)
-    : m_chunkSize(chunkSize), m_renderDistanceXZ(renderDistanceXZ), // 初期化リストを更新
+    : m_chunkSize(chunkSize), m_renderDistance(renderDistanceXZ), // 初期化リストを更新
       m_terrainGenerator(std::make_unique<TerrainGenerator>(noiseSeed, noiseScale, worldMaxHeight, groundLevel,
                                                             octaves, lacunarity, persistence))
 {
     std::cout << "ChunkManager constructor called. ChunkSize: " << m_chunkSize
-              << ", RenderDistanceXZ: " << m_renderDistanceXZ
-              << ", RenderDistanceY: " << m_renderDistanceY << std::endl;
+              << ", RenderDistanceXZ: " << m_renderDistance
+              << ", RenderDistanceY: " << std::endl;
 }
 
 // デストラクタ
@@ -110,7 +110,7 @@ std::shared_ptr<Chunk> ChunkManager::generateChunk(const glm::ivec3 &chunkCoord)
 // チャンクのメッシュを生成し、レンダリングデータを更新
 void ChunkManager::updateChunkMesh(const glm::ivec3 &chunkCoord, std::shared_ptr<Chunk> chunk)
 {
-    ChunkMeshData meshData = ChunkMeshGenerator::generateMesh(*chunk, 1.0f);
+    ChunkMeshData meshData = ChunkMeshGenerator::generateMesh(*chunk);
     m_chunkRenderData[chunkCoord] = ChunkRenderer::createChunkRenderData(meshData);
     std::cout << "Updated mesh for chunk at: (" << chunkCoord.x << ", " << chunkCoord.y << ", " << chunkCoord.z << ")\n";
 }
@@ -118,11 +118,11 @@ void ChunkManager::updateChunkMesh(const glm::ivec3 &chunkCoord, std::shared_ptr
 // 指定された座標範囲内のチャンクをロード
 void ChunkManager::loadChunksInArea(const glm::ivec3 &centerChunkCoord)
 {
-    for (int x = -m_renderDistanceXZ; x <= m_renderDistanceXZ; ++x)
+    for (int x = -m_renderDistance; x <= m_renderDistance; ++x)
     {
-        for (int y = -m_renderDistanceXZ; y <= m_renderDistanceXZ; ++y)
+        for (int y = -m_renderDistance; y <= m_renderDistance; ++y)
         { // ★★★ Y軸方向のループを追加 ★★★
-            for (int z = -m_renderDistanceXZ; z <= m_renderDistanceXZ; ++z)
+            for (int z = -m_renderDistance; z <= m_renderDistance; ++z)
             {
                 glm::ivec3 currentChunkCoord = glm::ivec3(centerChunkCoord.x + x, centerChunkCoord.y + y, centerChunkCoord.z + z); // Y座標も考慮
 
@@ -147,7 +147,7 @@ void ChunkManager::unloadDistantChunks(const glm::ivec3 &centerChunkCoord)
         int dist_y = std::abs(coord.y - centerChunkCoord.y); // ★★★ Y軸方向の距離も考慮 ★★★
         int dist_z = std::abs(coord.z - centerChunkCoord.z);
 
-        if (dist_x > m_renderDistanceXZ || dist_y > m_renderDistanceXZ || dist_z > m_renderDistanceXZ)
+        if (dist_x > m_renderDistance || dist_y > m_renderDistance || dist_z > m_renderDistance)
         { // Y軸の距離もチェック
             chunksToUnload.push_back(coord);
         }

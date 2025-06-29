@@ -7,13 +7,13 @@
 // 各面の「基本頂点」は、面の形を定義する最小限の4つの頂点と考える
 const std::vector<Vertex> baseCubeVertices = {
     {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}, // 0: Back-bottom-left (Z-)
-    {1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f},  // 1: Back-bottom-right (Z-)
-    {1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f},   // 2: Back-top-right (Z-)
-    {0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f},  // 3: Back-top-left (Z-)
-    {1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f},    // 4: Front-top-right (Z+)
-    {1.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f},   // 5: Front-bottom-right (Z+)
-    {0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f},  // 6: Front-bottom-left (Z+)
-    {0.0f, 1.0f, 1.0f, 0.5f, 0.5f, 0.5f}    // 7: Front-top-left (Z+)
+    {1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f}, // 1: Back-bottom-right (Z-)
+    {1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f}, // 2: Back-top-right (Z-)
+    {0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f}, // 3: Back-top-left (Z-)
+    {1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f}, // 4: Front-top-right (Z+)
+    {1.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f}, // 5: Front-bottom-right (Z+)
+    {0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f}, // 6: Front-bottom-left (Z+)
+    {0.0f, 1.0f, 1.0f, 0.5f, 0.5f, 0.5f}  // 7: Front-top-left (Z+)
 };
 
 // 各面ごとの基本頂点インデックス（baseCubeVerticesへの参照）
@@ -45,8 +45,7 @@ const std::array<std::array<unsigned int, 4>, 6> cubeFaceBaseIndices = {
 
     // 5: Top face (Y+): 法線(0,1,0)
     // 外側から見てCCW: 3, 7, 4, 2 (左下、左上、右上、右下)
-    std::array<unsigned int, 4>{3, 7, 4, 2}
-};
+    std::array<unsigned int, 4>{3, 7, 4, 2}};
 
 // 各面に対応する隣接ボクセルのオフセット (x, y, z)
 const std::array<glm::ivec3, 6> neighborOffsets = {
@@ -58,7 +57,7 @@ const std::array<glm::ivec3, 6> neighborOffsets = {
     glm::ivec3(0, 1, 0)   // Top face (Y+)
 };
 
-ChunkMeshData ChunkMeshGenerator::generateMesh(const Chunk &chunk, float cubeSpacing)
+ChunkMeshData ChunkMeshGenerator::generateMesh(const Chunk &chunk)
 {
     ChunkMeshData meshData;
     int chunkSize = chunk.getSize();
@@ -108,9 +107,9 @@ ChunkMeshData ChunkMeshGenerator::generateMesh(const Chunk &chunk, float cubeSpa
                                 Vertex baseVertex = baseCubeVertices[baseIdx];
                                 Vertex newVertex = baseVertex;
                                 // ボクセル位置にオフセットを適用し、間隔を考慮
-                                newVertex.x += x * cubeSpacing;
-                                newVertex.y += y * cubeSpacing;
-                                newVertex.z += z * cubeSpacing;
+                                newVertex.x += x;
+                                newVertex.y += y;
+                                newVertex.z += z;
                                 meshData.vertices.push_back(newVertex);
                             }
 

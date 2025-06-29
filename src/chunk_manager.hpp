@@ -37,8 +37,7 @@ public:
 
 private:
     int m_chunkSize;
-    int m_renderDistanceXZ; // X/Z軸方向の描画距離
-    int m_renderDistanceY;  // ★★★ 新しく追加：Y軸方向の描画距離 ★★★
+    int m_renderDistance;
 
     std::unique_ptr<TerrainGenerator> m_terrainGenerator;
 

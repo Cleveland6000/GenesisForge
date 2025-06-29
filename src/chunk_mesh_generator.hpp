@@ -20,7 +20,7 @@ struct ChunkMeshData
 class ChunkMeshGenerator
 {
 public:
-    static ChunkMeshData generateMesh(const Chunk &chunk, float cubeSpacing = 1.0f);
+    static ChunkMeshData generateMesh(const Chunk &chunk);
 };
 
 #endif // CHUNK_MESH_GENERATOR_HPP
