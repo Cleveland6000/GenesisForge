@@ -27,10 +27,12 @@ ChunkRenderData ChunkRenderer::createChunkRenderData(const ChunkMeshData& meshDa
     // 色属性 (location = 1)
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, r));
     glEnableVertexAttribArray(1);
-    // テクスチャ座標属性 (location = 2) を追加
-    // Vertex構造体内の 'u' メンバーへのオフセットを指定
+    // テクスチャ座標属性 (location = 2)
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, u));
     glEnableVertexAttribArray(2);
+    // 法線属性 (location = 3) を追加
+    glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, nx));
+    glEnableVertexAttribArray(3);
 
     glBindVertexArray(0);
 

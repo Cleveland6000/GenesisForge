@@ -7,13 +7,13 @@
 // 今回はFontLoader.cppなど別のファイルで定義されているか、新しいファイルで定義することを想定し、ここでは定義しません。
 #include "../dependencies/include/stb_image.hpp" // stb_image.h への正しいパスを設定してください
 
-Renderer::Renderer() : m_shaderProgram(0), m_textRenderer(), m_textureID(0) {} // m_textureIDを初期化
+Renderer::Renderer() : m_shaderProgram(0), m_textRenderer(), m_textureID(0) {}
 
 Renderer::~Renderer()
 {
     glDeleteProgram(m_shaderProgram);
     if (m_textureID != 0) {
-        glDeleteTextures(1, &m_textureID); // テクスチャを解放
+        glDeleteTextures(1, &m_textureID);
     }
 }
 
@@ -34,34 +34,33 @@ bool Renderer::initialize(const FontData &fontData)
         return false;
     }
 
-    // テクスチャをロード
-    // 実行ファイルからの相対パスを確認してください
     if (!loadTexture("../textures/my_block_texture.png")) {
         std::cerr << "Failed to load block texture.\n";
         return false;
     }
 
-    // ロードしたテクスチャをシェーダーのuniformに設定
     glUseProgram(m_shaderProgram);
     glUniform1i(glGetUniformLocation(m_shaderProgram, "ourTexture"), 0); // テクスチャユニット0を使用
+
+    // ライティング関連のユニフォーム初期値を設定
+    glUniform3f(glGetUniformLocation(m_shaderProgram, "lightDir"), 0.5f, -1.0f, 0.5f); // 光源の方向 (例: 右上奥から手前下)
+    glUniform1f(glGetUniformLocation(m_shaderProgram, "ambientStrength"), 0.3f); // 環境光の強さ
+
     glUseProgram(0);
 
     return true;
 }
 
-// テクスチャをロードする関数の実装
 bool Renderer::loadTexture(const std::string& path) {
     glGenTextures(1, &m_textureID);
     glBindTexture(GL_TEXTURE_2D, m_textureID);
 
-    // テクスチャパラメータの設定 (テクスチャがピクセルアート風になるようにNEARESTを設定)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
     int width, height, nrChannels;
-    // stb_image を使用して画像をロード
     unsigned char *data = stbi_load(path.c_str(), &width, &height, &nrChannels, 0);
     if (data)
     {
@@ -71,16 +70,14 @@ bool Renderer::loadTexture(const std::string& path) {
         } else if (nrChannels == 3) {
             format = GL_RGB;
         }
-        // テクスチャをOpenGLに転送
         glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D); // ミップマップを生成 (NEARESTフィルターでは必須ではありませんが、良い習慣です)
-        stbi_image_free(data); // 画像データを解放
+        glGenerateMipmap(GL_TEXTURE_2D);
+        stbi_image_free(data);
         return true;
     }
     else
     {
         std::cerr << "Failed to load texture at path: " << path << std::endl;
-        // ロード失敗時でもdataがNULLでない場合があるため、stbi_image_freeを呼ぶ
         if (data) stbi_image_free(data);
         return false;
     }
@@ -101,7 +98,6 @@ void Renderer::renderScene(const glm::mat4 &projection, const glm::mat4 &view, c
 
     glUseProgram(m_shaderProgram);
 
-    // テクスチャユニット0をアクティブにし、テクスチャをバインド
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, m_textureID);
 
@@ -109,11 +105,16 @@ void Renderer::renderScene(const glm::mat4 &projection, const glm::mat4 &view, c
     glUniformMatrix4fv(glGetUniformLocation(m_shaderProgram, "view"), 1, GL_FALSE, glm::value_ptr(view));
     glUniformMatrix4fv(glGetUniformLocation(m_shaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(model));
 
+    // NormalMatrix を計算してシェーダーに渡す
+    // モデル行列の左上3x3部分を抽出して逆転置
+    glm::mat3 normalMatrix = glm::mat3(glm::transpose(glm::inverse(model)));
+    glUniformMatrix3fv(glGetUniformLocation(m_shaderProgram, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(normalMatrix));
+
     glBindVertexArray(chunkRenderData.VAO);
     glDrawElements(GL_TRIANGLES, chunkRenderData.indexCount, GL_UNSIGNED_INT, 0);
     glBindVertexArray(0);
 
-    glBindTexture(GL_TEXTURE_2D, 0); // テクスチャのバインドを解除
+    glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 void Renderer::renderOverlay(int screenWidth, int screenHeight, const std::string &fpsString, const std::string &positionString)

@@ -4,8 +4,9 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/matrix_inverse.hpp> // <- これを追加
 #include <memory>
-#include <string> // std::string を使うために追加
+#include <string>
 #include <vector>
 #include "FontLoader.hpp"
 #include "TextRenderer.hpp"
@@ -69,8 +70,8 @@ private:
     GLuint m_shaderProgram;
     FontData m_fontData;
     TextRenderer m_textRenderer;
-    GLuint m_textureID; // テクスチャIDを追加
-    bool loadTexture(const std::string& path); // テクスチャロード関数を追加
+    GLuint m_textureID;
+    bool loadTexture(const std::string& path);
 };
 
 #endif // RENDERER_HPP

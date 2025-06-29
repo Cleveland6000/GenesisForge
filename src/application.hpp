@@ -56,7 +56,7 @@ private:
     // 定数定義 (あなたの既存のコードから移動)
     static constexpr int CHUNK_GRID_SIZE = 16;      // チャンクのサイズ
     static constexpr float NOISE_SCALE = 0.006f;    // パーリンノイズの全体的なスケール（細かさ）
-    static constexpr int RENDER_DISTANCE_CHUNKS = 6; // プレイヤーからのチャンクの描画距離（X/Z軸チャンク単位）
+    static constexpr int RENDER_DISTANCE_CHUNKS = 8; // プレイヤーからのチャンクの描画距離（X/Z軸チャンク単位）
     static constexpr unsigned int WORLD_SEED = 12345; // ワールド生成のための固定シード
     static constexpr int WORLD_MAX_HEIGHT = 24;     // ワールド全体のボクセルの最大高さ
     static constexpr int GROUND_LEVEL = 0;         // 地表の基準となる高さ (WORLD_MAX_HEIGHT の中間など)
