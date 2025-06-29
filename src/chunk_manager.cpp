@@ -3,6 +3,7 @@
 #include <chrono>
 #include <algorithm>
 #include <limits>
+#include <thread> // std::thread::hardware_concurrency() のために必要
 #include "chunk_mesh_generator.hpp" // neighborOffsets が定義されるため、このインクルードで解決されます
 
 // コンストラクタ
@@ -11,7 +12,8 @@ ChunkManager::ChunkManager(int chunkSize, int renderDistanceXZ, unsigned int noi
     : m_chunkSize(chunkSize), m_renderDistance(renderDistanceXZ),
       m_terrainGenerator(std::make_unique<TerrainGenerator>(noiseSeed, noiseScale, worldMaxHeight, groundLevel,
                                                              octaves, lacunarity, persistence)),
-      m_lastPlayerChunkCoord(std::numeric_limits<int>::max())
+      m_lastPlayerChunkCoord(std::numeric_limits<int>::max()),
+      m_threadPool(std::make_unique<ThreadPool>(std::thread::hardware_concurrency() > 0 ? std::thread::hardware_concurrency() : 2))
 {
     std::cout << "ChunkManager constructor called. ChunkSize: " << m_chunkSize
               << ", RenderDistanceXZ: " << m_renderDistance << std::endl;
@@ -21,6 +23,8 @@ ChunkManager::ChunkManager(int chunkSize, int renderDistanceXZ, unsigned int noi
 ChunkManager::~ChunkManager()
 {
     std::cout << "ChunkManager destructor called." << std::endl;
+    // m_threadPool は unique_ptr なので、スコープを抜けるときに自動的にデストラクタが呼び出され、
+    // ThreadPoolのデストラクタ内で全てのスレッドが安全に終了するまで待機します。
     m_chunkRenderData.clear();
 }
 
@@ -34,14 +38,80 @@ void ChunkManager::update(const glm::vec3 &playerPosition)
         loadChunksInArea(currentChunkCoord);
         unloadDistantChunks(currentChunkCoord);
         m_lastPlayerChunkCoord = currentChunkCoord;
+    }
 
-        for (auto &pair : m_chunks)
+    // ★変更: 完了した地形生成タスクを処理
+    // m_pendingTerrainTasks はマップであり、イテレータの無効化を避けるためにコピーまたは一時的なリストを使う
+    // または、イテレータを安全に管理しながら削除する
+    for (auto it = m_pendingTerrainTasks.begin(); it != m_pendingTerrainTasks.end(); )
+    {
+        // ノンブロッキングでタスクの完了をチェック
+        if (it->second.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
         {
-            if (pair.second->isDirty())
-            {
-                updateChunkMesh(pair.first, pair.second);
-                pair.second->setDirty(false);
+            glm::ivec3 chunkCoord = it->first;
+            std::shared_ptr<Chunk> chunk = it->second.get(); // 結果を取得（既にreadyなのでブロックされない）
+
+            // メインスレッドからのみアクセスされる m_chunks にチャンクを追加
+            // ここでチャンクの挿入を保護する必要がある場合は、m_chunkGenerationMutex を使用します
+            // ただし、update関数はメインスレッドで実行される前提であれば、m_chunksへの直接アクセスは問題ありません
+            m_chunks[chunkCoord] = chunk;
+            
+            // 地形生成が完了したチャンクの隣接チャンクをダーティにする
+            // ここで getChunk を呼び出すため、m_chunks が更新された後に実行されることが重要
+            for (int i = 0; i < 6; ++i) {
+                glm::ivec3 offset = neighborOffsets[i];
+                glm::ivec3 neighborCoord = chunkCoord + offset;
+                std::shared_ptr<Chunk> neighborChunk = getChunk(neighborCoord);
+                if (neighborChunk) {
+                    neighborChunk->setDirty(true);
+                }
             }
+
+            // メッシュ生成タスクをスレッドプールに投入
+            // updateChunkMesh は ChunkMeshData を返すように変更されています
+            auto mesh_future = m_threadPool->enqueue([this, chunkCoord, chunk]() {
+                // updateChunkMesh 内で getChunk が使われる可能性があるため、
+                // 隣接チャンクがまだ生成されていない場合でも安全に動作することを確認してください。
+                // (例えば、getChunkがnullptrを返す、ChunkMeshGeneratorがnullptrを処理できるなど)
+                return updateChunkMesh(chunkCoord, chunk);
+            });
+            // m_pendingMeshTasks にタスクを追加（メインスレッドからアクセスなのでロックは不要）
+            m_pendingMeshTasks[chunkCoord] = std::move(mesh_future);
+
+            // 処理済みタスクをマップから削除
+            it = m_pendingTerrainTasks.erase(it);
+        }
+        else
+        {
+            ++it; // 次のタスクへ
+        }
+    }
+
+    // ★変更: 完了したメッシュ生成タスクを処理（OpenGLリソースの作成）
+    // m_pendingMeshTasks から直接 future を取得して処理する
+    for (auto it = m_pendingMeshTasks.begin(); it != m_pendingMeshTasks.end(); )
+    {
+        if (it->second.wait_for(std::chrono::seconds(0)) == std::future_status::ready) // ノンブロッキングチェック
+        {
+            glm::ivec3 chunkCoord = it->first;
+            ChunkMeshData meshData = it->second.get(); // 結果を取得（既にreadyなのでブロックされない）
+
+            // OpenGLの呼び出しはメインスレッドで行う必要があります！
+            // ChunkRenderer::createChunkRenderData は OpenGL のコンテキストを必要とします。
+            m_chunkRenderData[chunkCoord] = ChunkRenderer::createChunkRenderData(meshData);
+
+            // メッシュ生成が完了したチャンクのダーティフラグをリセット
+            auto chunkIt = m_chunks.find(chunkCoord);
+            if (chunkIt != m_chunks.end()) {
+                chunkIt->second->setDirty(false); // メッシュ生成が完了したのでダーティフラグを解除
+            }
+
+            // 処理済みタスクをマップから削除
+            it = m_pendingMeshTasks.erase(it);
+        }
+        else
+        {
+            ++it; // 次のタスクへ
         }
     }
 }
@@ -64,8 +134,10 @@ std::shared_ptr<Chunk> ChunkManager::getChunk(const glm::ivec3 &chunkCoord)
 }
 
 // チャンクを生成して初期化（ボクセルデータを一括設定）
+// ★変更: この関数はスレッドプールによってバックグラウンドで呼び出されるようになります
 std::shared_ptr<Chunk> ChunkManager::generateChunk(const glm::ivec3 &chunkCoord)
 {
+    // std::cout << "Generating terrain for chunk: " << chunkCoord.x << ", " << chunkCoord.y << ", " << chunkCoord.z << std::endl;
     std::shared_ptr<Chunk> newChunk = std::make_shared<Chunk>(m_chunkSize);
 
     if (!m_terrainGenerator)
@@ -113,23 +185,30 @@ std::shared_ptr<Chunk> ChunkManager::generateChunk(const glm::ivec3 &chunkCoord)
     }
 
     newChunk->setVoxels(tempVoxels);
-    newChunk->setDirty(true);
+    newChunk->setDirty(true); // 地形生成が終わったらメッシュ生成が必要なのでダーティにする
     return newChunk;
 }
 
 // チャンクのメッシュを生成し、レンダリングデータを更新します
-void ChunkManager::updateChunkMesh(const glm::ivec3 &chunkCoord, std::shared_ptr<Chunk> chunk)
+// ★変更: この関数はスレッドプールによってバックグラウンドで呼び出されるようになります
+//         OpenGL呼び出しはここから削除し、メインスレッドに移動します。
+ChunkMeshData ChunkManager::updateChunkMesh(const glm::ivec3 &chunkCoord, std::shared_ptr<Chunk> chunk)
 {
-    // 隣接チャンクを取得
-    const Chunk* neighbor_neg_x = getChunk(glm::ivec3(chunkCoord.x - 1, chunkCoord.y, chunkCoord.z)).get();
-    const Chunk* neighbor_pos_x = getChunk(glm::ivec3(chunkCoord.x + 1, chunkCoord.y, chunkCoord.z)).get();
-    const Chunk* neighbor_neg_y = getChunk(glm::ivec3(chunkCoord.x, chunkCoord.y - 1, chunkCoord.z)).get();
-    const Chunk* neighbor_pos_y = getChunk(glm::ivec3(chunkCoord.x, chunkCoord.y + 1, chunkCoord.z)).get();
-    const Chunk* neighbor_neg_z = getChunk(glm::ivec3(chunkCoord.x, chunkCoord.y, chunkCoord.z - 1)).get();
-    const Chunk* neighbor_pos_z = getChunk(glm::ivec3(chunkCoord.x, chunkCoord.y, chunkCoord.z + 1)).get();
+    // 隣接チャンクを取得 (ここではチャンクのボクセルデータのみ必要なので、const Chunk* で十分)
+    // 注意: 非同期メッシュ生成の場合、隣接チャンクがまだロードされていない、
+    // または地形生成中の可能性があるため、注意が必要です。
+    // そのため、ここではgetChunkを呼び出していますが、完全に非同期化する際は、
+    // 隣接チャンクのボクセルデータもスレッドに安全に渡すか、
+    // メッシュ生成の前にそれらのチャンクが完全に存在することを保証するロジックが必要です。
+    // この例では、getChunkが安全にnullptrを返し、ChunkMeshGeneratorがnullptrを処理できることを前提としています。
+    const Chunk* neighbor_neg_x = hasChunk(glm::ivec3(chunkCoord.x - 1, chunkCoord.y, chunkCoord.z)) ? getChunk(glm::ivec3(chunkCoord.x - 1, chunkCoord.y, chunkCoord.z)).get() : nullptr;
+    const Chunk* neighbor_pos_x = hasChunk(glm::ivec3(chunkCoord.x + 1, chunkCoord.y, chunkCoord.z)) ? getChunk(glm::ivec3(chunkCoord.x + 1, chunkCoord.y, chunkCoord.z)).get() : nullptr;
+    const Chunk* neighbor_neg_y = hasChunk(glm::ivec3(chunkCoord.x, chunkCoord.y - 1, chunkCoord.z)) ? getChunk(glm::ivec3(chunkCoord.x, chunkCoord.y - 1, chunkCoord.z)).get() : nullptr;
+    const Chunk* neighbor_pos_y = hasChunk(glm::ivec3(chunkCoord.x, chunkCoord.y + 1, chunkCoord.z)) ? getChunk(glm::ivec3(chunkCoord.x, chunkCoord.y + 1, chunkCoord.z)).get() : nullptr;
+    const Chunk* neighbor_neg_z = hasChunk(glm::ivec3(chunkCoord.x, chunkCoord.y, chunkCoord.z - 1)) ? getChunk(glm::ivec3(chunkCoord.x, chunkCoord.y, chunkCoord.z - 1)).get() : nullptr;
+    const Chunk* neighbor_pos_z = hasChunk(glm::ivec3(chunkCoord.x, chunkCoord.y, chunkCoord.z + 1)) ? getChunk(glm::ivec3(chunkCoord.x, chunkCoord.y, chunkCoord.z + 1)).get() : nullptr;
     
     // ChunkMeshGenerator を使用してメッシュデータを生成します
-    // 隣接チャンクのポインタを渡す
     ChunkMeshData meshData = ChunkMeshGenerator::generateMesh(
         *chunk,
         neighbor_neg_x, neighbor_pos_x,
@@ -137,8 +216,16 @@ void ChunkManager::updateChunkMesh(const glm::ivec3 &chunkCoord, std::shared_ptr
         neighbor_neg_z, neighbor_pos_z
     );
 
-    // レンダリングデータを更新します
-    m_chunkRenderData[chunkCoord] = ChunkRenderer::createChunkRenderData(meshData);
+    // ★重要: ここで直接 OpenGL の呼び出しを削除します。
+    // m_chunkRenderData[chunkCoord] = ChunkRenderer::createChunkRenderData(meshData);
+
+    // m_generatedMeshes は今後使用しないため削除
+    // {
+    //     std::lock_guard<std::mutex> lock(m_meshGenerationMutex);
+    //     m_generatedMeshes.push({chunkCoord, meshData});
+    // }
+
+    return meshData; // メッシュデータを返すように変更
 }
 
 // 指定された座標範囲内のチャンクをロードします
@@ -146,26 +233,23 @@ void ChunkManager::loadChunksInArea(const glm::ivec3 &centerChunkCoord)
 {
     for (int x = -m_renderDistance; x <= m_renderDistance; ++x)
     {
-        for (int y = -m_renderDistance; y <= m_renderDistance; ++y)
+        for (int y = -m_renderDistance; y <= m_renderDistance; ++y) // Y軸方向の描画距離も考慮
         {
             for (int z = -m_renderDistance; z <= m_renderDistance; ++z)
             {
                 glm::ivec3 currentChunkCoord = glm::ivec3(centerChunkCoord.x + x, centerChunkCoord.y + y, centerChunkCoord.z + z);
 
-                if (!hasChunk(currentChunkCoord))
+                // チャンクが存在しない、かつ地形生成タスクがキューにない場合にのみ地形生成をトリガー
+                if (!hasChunk(currentChunkCoord) && m_pendingTerrainTasks.find(currentChunkCoord) == m_pendingTerrainTasks.end())
                 {
-                    std::shared_ptr<Chunk> newChunk = generateChunk(currentChunkCoord);
-                    m_chunks[currentChunkCoord] = newChunk;
-                    
-                    // 新しいチャンクがロードされたときに、その隣接チャンク（既に存在する場合）もダーティにする
-                    for (int i = 0; i < 6; ++i) {
-                        glm::ivec3 offset = neighborOffsets[i];
-                        glm::ivec3 neighborCoord = currentChunkCoord + offset;
-                        std::shared_ptr<Chunk> neighborChunk = getChunk(neighborCoord);
-                        if (neighborChunk) {
-                            neighborChunk->setDirty(true);
-                        }
-                    }
+                    // 非同期で地形生成タスクをスレッドプールに投入
+                    auto future = m_threadPool->enqueue([this, currentChunkCoord]() {
+                        return generateChunk(currentChunkCoord);
+                    });
+                    m_pendingTerrainTasks[currentChunkCoord] = std::move(future);
+
+                    // ここでは隣接チャンクをダーティに設定しません。
+                    // チャンクが完全にロードされ、m_chunksに追加された後（update関数内）で処理します。
                 }
             }
         }
@@ -191,17 +275,22 @@ void ChunkManager::unloadDistantChunks(const glm::ivec3 &centerChunkCoord)
     for (const auto &coord : chunksToUnload)
     {
         // チャンクがアンロードされるときに、その隣接チャンク（まだ存在する場合）もダーティにする
+        // この処理は、チャンクが完全にアンロードされる直前に行うのが適切
         for (int i = 0; i < 6; ++i) {
             glm::ivec3 offset = neighborOffsets[i];
             glm::ivec3 neighborCoord = coord + offset;
             std::shared_ptr<Chunk> neighborChunk = getChunk(neighborCoord);
             if (neighborChunk) {
-                neighborChunk->setDirty(true);
+                neighborChunk->setDirty(true); // 隣接チャンクのメッシュを再生成させるためにダーティに
             }
         }
 
         m_chunkRenderData.erase(coord);
         m_chunks.erase(coord);
+        // ★追加: 終了していない保留中のタスクもクリーンアップ (必須)
+        // erase は要素が存在しない場合でも安全に動作します
+        m_pendingTerrainTasks.erase(coord);
+        m_pendingMeshTasks.erase(coord);
     }
 }
 
