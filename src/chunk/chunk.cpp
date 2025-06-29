@@ -30,13 +30,12 @@ bool Chunk::getVoxel(int x, int y, int z) const
     return m_voxels[getIndex(x, y, z)];
 }
 
-// 新しく追加するsetVoxelsメソッドの実装
-void Chunk::setVoxels(const std::vector<bool>& voxels)
+void Chunk::setVoxels(const std::vector<bool> &voxels)
 {
     if (voxels.size() != static_cast<size_t>(m_size * m_size * m_size))
     {
         throw std::invalid_argument("Input voxel data size does not match chunk dimensions.");
     }
-    m_voxels = voxels; // 渡されたベクトルをコピーまたはムーブ
-    m_isDirty = true; // ボクセルデータが変更されたのでダーティフラグを立てる
+    m_voxels = voxels;
+    m_isDirty = true;
 }
