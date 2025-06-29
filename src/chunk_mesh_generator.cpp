@@ -57,22 +57,32 @@ const std::array<glm::ivec3, 6> neighborOffsets = {
     glm::ivec3(0, 1, 0)   // Top face (Y+)
 };
 
+// ボクセル座標からm_voxelsのインデックスを計算するヘルパー関数
+// ChunkクラスのgetIndexと内容は同じですが、境界チェックを行わないため、
+// ループ内で頻繁に呼ばれる際にオーバーヘッドを削減できます。
+// ただし、呼び出し元で境界チェックを保証する必要があります。
+inline size_t getVoxelIndex(int x, int y, int z, int chunkSize) {
+    return static_cast<size_t>(x + y * chunkSize + z * chunkSize * chunkSize);
+}
+
 ChunkMeshData ChunkMeshGenerator::generateMesh(const Chunk &chunk)
 {
     ChunkMeshData meshData;
     int chunkSize = chunk.getSize();
+    const std::vector<bool>& voxels = chunk.getVoxels(); // ボクセルデータを直接取得
 
     // 最適化: 事前にベクタの容量を予約
     meshData.vertices.reserve(chunkSize * chunkSize * chunkSize * 4 * 6);
     meshData.indices.reserve(chunkSize * chunkSize * chunkSize * 6 * 6);
 
-    for (int x = 0; x < chunkSize; ++x)
+    for (int z = 0; z < chunkSize; ++z) // Z, Y, X の順にループすることでキャッシュヒット率を向上させる可能性がある
     {
         for (int y = 0; y < chunkSize; ++y)
         {
-            for (int z = 0; z < chunkSize; ++z)
+            for (int x = 0; x < chunkSize; ++x)
             {
-                if (chunk.getVoxel(x, y, z))
+                // getVoxelの代わりに直接voxels配列にアクセス
+                if (voxels[getVoxelIndex(x, y, z, chunkSize)])
                 { // 現在のボクセルが存在する場合
                     size_t currentVertexCount = meshData.vertices.size();
 
@@ -90,7 +100,8 @@ ChunkMeshData ChunkMeshGenerator::generateMesh(const Chunk &chunk)
                             neighborY >= 0 && neighborY < chunkSize &&
                             neighborZ >= 0 && neighborZ < chunkSize)
                         {
-                            if (chunk.getVoxel(neighborX, neighborY, neighborZ))
+                            // getVoxelの代わりに直接voxels配列にアクセス
+                            if (voxels[getVoxelIndex(neighborX, neighborY, neighborZ, chunkSize)])
                             {
                                 renderFace = false;
                             }
@@ -100,8 +111,6 @@ ChunkMeshData ChunkMeshGenerator::generateMesh(const Chunk &chunk)
                         {
                             // この面を描画する必要がある場合
                             // 各面の4つの基本頂点を追加
-                            // cubeFaceBaseIndices[i] は、外側から見てCCWになるように並べられた4つの頂点のインデックス
-                            // V0 (0) V1 (1) V2 (2) V3 (3)
                             for (unsigned int baseIdx : cubeFaceBaseIndices[i])
                             {
                                 Vertex baseVertex = baseCubeVertices[baseIdx];
