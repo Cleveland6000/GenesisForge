@@ -1,18 +1,17 @@
 #ifndef TIMER_HPP
 #define TIMER_HPP
 
-class Timer
-{
+#include <functional>
+
+class Timer {
 public:
-    Timer();
+    explicit Timer(std::function<double()> getTimeFunc);
     float tick();
     float getDeltaTime() const { return m_deltaTime; }
     float getTotalTime() const { return m_totalTime; }
-
 private:
-    float m_lastFrameTime;
-    float m_deltaTime;
-    float m_totalTime;
+    std::function<double()> m_getTimeFunc;
+    float m_lastFrameTime, m_deltaTime, m_totalTime;
 };
 
 #endif // TIMER_HPP

@@ -11,7 +11,8 @@
 Application::Application()
     : m_windowContext(std::make_unique<WindowContext>("Hello OpenGL Cubes", INITIAL_SCR_WIDTH, INITIAL_SCR_HEIGHT)),
       m_camera(std::make_unique<Camera>(glm::vec3(0.0f))),
-      m_timer(std::make_unique<Timer>()),
+      m_timer(std::make_unique<Timer>([]()
+                                      { return glfwGetTime(); })),
       m_inputManager(std::make_unique<InputManager>(*m_camera)),
       m_fontLoader(std::make_unique<FontLoader>()),
       m_fontData(std::make_unique<FontData>()),

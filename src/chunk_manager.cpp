@@ -316,7 +316,5 @@ void ChunkManager::updateChunkRenderData(const glm::ivec3 &chunkCoord, const Chu
     }
     else
     {
-        std::cout << "Generated empty mesh data for chunk "
-                  << chunkCoord.x << ", " << chunkCoord.y << ", " << chunkCoord.z << std::endl;
     }
 }

@@ -1,16 +1,15 @@
-#include <GLFW/glfw3.h>
 #include "timer.hpp"
 
-Timer::Timer() : m_lastFrameTime(0.0f), m_deltaTime(0.0f), m_totalTime(0.0f)
-{
-    m_lastFrameTime = static_cast<float>(glfwGetTime());
-}
+Timer::Timer(std::function<double()> getTimeFunc)
+    : m_getTimeFunc(getTimeFunc),
+      m_lastFrameTime(static_cast<float>(getTimeFunc())),
+      m_deltaTime(0.0f),
+      m_totalTime(0.0f) {}
 
-float Timer::tick()
-{
-    float currentFrameTime = static_cast<float>(glfwGetTime());
-    m_deltaTime = currentFrameTime - m_lastFrameTime;
+float Timer::tick() {
+    float current = static_cast<float>(m_getTimeFunc());
+    m_deltaTime = current - m_lastFrameTime;
     m_totalTime += m_deltaTime;
-    m_lastFrameTime = currentFrameTime;
+    m_lastFrameTime = current;
     return m_deltaTime;
 }
