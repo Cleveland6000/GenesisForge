@@ -7,7 +7,6 @@
 // chunk_renderer.hpp は updateChunkRenderData で使用するため残す
 #include "chunk_renderer.hpp"
 
-
 // コンストラクタ
 ChunkManager::ChunkManager(int chunkSize, int renderDistanceXZ, unsigned int noiseSeed, float noiseScale,
                            int worldMaxHeight, int groundLevel, int octaves, float lacunarity, float persistence)
@@ -20,7 +19,7 @@ ChunkManager::ChunkManager(int chunkSize, int renderDistanceXZ, unsigned int noi
       m_lastPlayerChunkCoord(std::numeric_limits<int>::max())
 {
     std::cout << "ChunkManager constructor called. ChunkSize: " << m_chunkSize
-              << ", RenderDistanceXZ: " << m_renderDistance << std::endl;
+              << ", RenderDistance: " << m_renderDistance << std::endl;
 }
 
 // デストラクタ (変更なし)
@@ -56,7 +55,7 @@ void ChunkManager::update(const glm::vec3 &playerPosition)
             {
                 m_chunks[chunkCoord] = newChunk;
                 newChunk->setDirty(true);
-                
+
                 // 新しく生成されたチャンクの隣接チャンクをダーティにする
                 for (int i = 0; i < 6; ++i)
                 {
@@ -88,16 +87,16 @@ void ChunkManager::update(const glm::vec3 &playerPosition)
         }
     }
 
-    for (const auto& chunkCoord : chunksToProcessMesh)
+    for (const auto &chunkCoord : chunksToProcessMesh)
     {
         std::shared_ptr<Chunk> chunk = m_chunks[chunkCoord];
 
         // ChunkProcessor の generateMeshForChunk を非同期で実行
         // this を NeighborChunkProvider* として渡す
         m_pendingMeshGenerations[chunkCoord] = std::async(std::launch::async,
-                                                         &ChunkProcessor::generateMeshForChunk,
-                                                         m_chunkProcessor.get(), // ChunkProcessor のインスタンス
-                                                         chunkCoord, chunk, this); // this は NeighborChunkProvider*
+                                                          &ChunkProcessor::generateMeshForChunk,
+                                                          m_chunkProcessor.get(),   // ChunkProcessor のインスタンス
+                                                          chunkCoord, chunk, this); // this は NeighborChunkProvider*
     }
 
     // 完了したメッシュ生成タスクの結果を処理 (OpenGLリソース更新はメインスレッドで行う)
@@ -151,19 +150,26 @@ glm::ivec3 ChunkManager::getChunkCoordFromWorldPos(const glm::vec3 &worldPos) co
 // プレイヤーを中心としたエリア内のチャンクをロード（存在しない場合は生成）
 void ChunkManager::loadChunksInArea(const glm::ivec3 &centerChunkCoord)
 {
-    for (int y = -m_renderDistance; y <= m_renderDistance; ++y)
+    for (int y_offset = -m_renderDistance; y_offset <= m_renderDistance; ++y_offset)
     {
-        for (int x = -m_renderDistance; x <= m_renderDistance; ++x)
+        for (int x_offset = -m_renderDistance; x_offset <= m_renderDistance; ++x_offset)
         {
-            for (int z = -m_renderDistance; z <= m_renderDistance; ++z)
+            for (int z_offset = -m_renderDistance; z_offset <= m_renderDistance; ++z_offset)
             {
-                glm::ivec3 chunkCoord = centerChunkCoord + glm::ivec3(x, y, z);
-                if (!hasChunk(chunkCoord) && m_pendingChunkGenerations.find(chunkCoord) == m_pendingChunkGenerations.end())
+                // 中心チャンクからの距離を計算 (球形にするための変更点)
+                float distance = std::sqrt(static_cast<float>(x_offset * x_offset + y_offset * y_offset + z_offset * z_offset));
+
+                // 距離がレンダリング距離内であればロード
+                if (distance <= m_renderDistance)
                 {
-                    // ChunkProcessor の generateChunkData を非同期で実行
-                    m_pendingChunkGenerations[chunkCoord] = std::async(std::launch::async,
-                                                                       &ChunkProcessor::generateChunkData,
-                                                                       m_chunkProcessor.get(), chunkCoord);
+                    glm::ivec3 chunkCoord = centerChunkCoord + glm::ivec3(x_offset, y_offset, z_offset);
+                    if (!hasChunk(chunkCoord) && m_pendingChunkGenerations.find(chunkCoord) == m_pendingChunkGenerations.end())
+                    {
+                        // ChunkProcessor の generateChunkData を非同期で実行
+                        m_pendingChunkGenerations[chunkCoord] = std::async(std::launch::async,
+                                                                           &ChunkProcessor::generateChunkData,
+                                                                           m_chunkProcessor.get(), chunkCoord);
+                    }
                 }
             }
         }
@@ -175,17 +181,21 @@ void ChunkManager::unloadDistantChunks(const glm::ivec3 &centerChunkCoord)
 {
     std::vector<glm::ivec3> chunksToUnload;
     for (auto const &[coord, chunk] : m_chunks)
+
     {
         int dist_x = std::abs(coord.x - centerChunkCoord.x);
         int dist_y = std::abs(coord.y - centerChunkCoord.y);
         int dist_z = std::abs(coord.z - centerChunkCoord.z);
 
-        if (dist_x > m_renderDistance || dist_y > m_renderDistance || dist_z > m_renderDistance)
+        // 球形アンロードの場合も、距離計算を調整
+        float distance = std::sqrt(static_cast<float>(dist_x * dist_x + dist_y * dist_y + dist_z * dist_z));
+
+        if (distance > m_renderDistance) // レンダリング距離の外側であればアンロード
+
         {
             chunksToUnload.push_back(coord);
         }
     }
-
     for (const auto &coord : chunksToUnload)
     {
         // チャンクがアンロードされるときに、その隣接チャンク（まだ存在する場合）もダーティにする
@@ -212,9 +222,12 @@ void ChunkManager::updateChunkRenderData(const glm::ivec3 &chunkCoord, const Chu
     if (it != m_chunkRenderData.end())
     {
         // 既存のVAO, VBO, EBOを削除
-        if (it->second.VAO != 0) glDeleteVertexArrays(1, &it->second.VAO);
-        if (it->second.VBO != 0) glDeleteBuffers(1, &it->second.VBO);
-        if (it->second.EBO != 0) glDeleteBuffers(1, &it->second.EBO);
+        if (it->second.VAO != 0)
+            glDeleteVertexArrays(1, &it->second.VAO);
+        if (it->second.VBO != 0)
+            glDeleteBuffers(1, &it->second.VBO);
+        if (it->second.EBO != 0)
+            glDeleteBuffers(1, &it->second.EBO);
         m_chunkRenderData.erase(it);
     }
 

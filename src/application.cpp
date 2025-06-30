@@ -26,8 +26,8 @@ Application::Application()
       m_fogColor(CLEAR_COLOR_R, CLEAR_COLOR_G, CLEAR_COLOR_B), // クリアカラーと同じ色に設定
       // RENDER_DISTANCE_CHUNKS に合わせてフォグの距離を調整
       m_fogStart(RENDER_DISTANCE_CHUNKS * CHUNK_GRID_SIZE * 0.5f), // 例: 描画距離の半分からフォグを開始
-      m_fogEnd(RENDER_DISTANCE_CHUNKS * CHUNK_GRID_SIZE * 1.0f),  // 例: 描画距離の終端で完全にフォグ
-      m_fogDensity(0.005f)         // 指数関数的フォグの密度 (小さいほど遠くまで見える)
+      m_fogEnd(RENDER_DISTANCE_CHUNKS * CHUNK_GRID_SIZE * 1.0f),   // 例: 描画距離の終端で完全にフォグ
+      m_fogDensity(0.005f)                                         // 指数関数的フォグの密度 (小さいほど遠くまで見える)
 {
 }
 
@@ -263,5 +263,5 @@ void Application::updateProjectionMatrix(int width, int height)
     float aspect = static_cast<float>(width) / static_cast<float>(height);
     // 遠クリッピング面はフォグの最大距離を考慮して設定
     // m_fogEnd を描画したい最大距離に設定し、それに少し余裕を持たせる
-    m_projectionMatrix = glm::perspective(glm::radians(m_camera->Zoom), aspect, 0.1f, m_fogEnd * 1.1f); // m_fogEnd の1.1倍まで描画
+    m_projectionMatrix = glm::perspective(glm::radians(m_camera->Zoom), aspect, 0.1f, m_fogEnd * 2.0f);
 }

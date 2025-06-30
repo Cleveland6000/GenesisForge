@@ -57,10 +57,10 @@ private:
     std::string m_positionString;
 
     // World generation constants
-    static constexpr int CHUNK_GRID_SIZE = 32;
+    static constexpr int CHUNK_GRID_SIZE = 16;
     static constexpr float NOISE_SCALE = 0.006f;
-    static constexpr int RENDER_DISTANCE_CHUNKS = 2; // <-- 描画距離を増やしました
-    static constexpr unsigned int WORLD_SEED = 12345;
+    static constexpr int RENDER_DISTANCE_CHUNKS = 6; // <-- 描画距離を増やしました
+    static constexpr unsigned int WORLD_SEED = 0;
     static constexpr int WORLD_MAX_HEIGHT = 24;
     static constexpr int GROUND_LEVEL = 0;
     static constexpr int TERRAIN_OCTAVES = 4;
