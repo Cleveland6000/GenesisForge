@@ -71,8 +71,6 @@ const Chunk* ChunkProcessor::getNeighbor(const glm::ivec3& currentChunkCoord, co
 ChunkMeshData ChunkProcessor::generateMeshForChunk(const glm::ivec3& chunkCoord, std::shared_ptr<Chunk> chunk,
                                                    NeighborChunkProvider* neighborProvider)
 {
-
-    
     if (!chunk)
     {
         std::cerr << "Error: Attempted to generate mesh data for a null chunk at "
