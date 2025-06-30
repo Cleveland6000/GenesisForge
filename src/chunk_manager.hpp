@@ -6,13 +6,11 @@
 #include <glm/glm.hpp>
 #include <future>
 #include <vector>
-#include <mutex> // std::mutex のために追加
 #include "chunk/chunk.hpp"
-#include "chunk_mesh_generator.hpp"
+#include "chunk_mesh_generator.hpp" // ChunkMeshData の定義のため
 #include "chunk_renderer.hpp"
-#include "terrain_generator.hpp"
-#include "chunk_processor.hpp"
-#include "thread_pool.hpp" // 新しい ThreadPool をインクルード
+#include "terrain_generator.hpp" // ChunkProcessor のコンストラクタに渡すため
+#include "chunk_processor.hpp" // 新しいクラスをインクルード
 
 // チャンクのワールド座標をキーとするハッシュ関数 (変更なし)
 struct Vec3iHash
@@ -23,17 +21,16 @@ struct Vec3iHash
     }
 };
 
-class ChunkManager : public NeighborChunkProvider
+class ChunkManager : public NeighborChunkProvider // NeighborChunkProvider を実装
 {
 public:
     ChunkManager(int chunkSize, int renderDistanceXZ, unsigned int noiseSeed, float noiseScale,
-                 int worldMaxHeight, int groundLevel, int octaves, float lacunarity, float persistence,
-                 size_t numWorkerThreads);
+                 int worldMaxHeight, int groundLevel, int octaves, float lacunarity, float persistence);
     ~ChunkManager();
 
     void update(const glm::vec3 &playerPosition);
-    bool hasChunk(const glm::ivec3 &chunkCoord) const; // ★ここがエラーの発生箇所
-    std::shared_ptr<Chunk> getChunk(const glm::ivec3 &chunkCoord) override; // NeighborChunkProvider のオーバーライド
+    bool hasChunk(const glm::ivec3 &chunkCoord) const;
+    std::shared_ptr<Chunk> getChunk(const glm::ivec3 &chunkCoord) override; // override を追加
     const std::unordered_map<glm::ivec3, ChunkRenderData, Vec3iHash> &getAllRenderData() const
     {
         return m_chunkRenderData;
@@ -43,8 +40,8 @@ private:
     int m_chunkSize;
     int m_renderDistance;
 
-    std::unique_ptr<ChunkProcessor> m_chunkProcessor;
-    std::unique_ptr<ThreadPool> m_threadPool;
+    // TerrainGenerator は ChunkProcessor に移動
+    std::unique_ptr<ChunkProcessor> m_chunkProcessor; // ChunkProcessor のインスタンスを持つ
 
     std::unordered_map<glm::ivec3, std::shared_ptr<Chunk>, Vec3iHash> m_chunks;
     std::unordered_map<glm::ivec3, ChunkRenderData, Vec3iHash> m_chunkRenderData;
@@ -55,14 +52,12 @@ private:
     std::unordered_map<glm::ivec3, std::future<std::shared_ptr<Chunk>>, Vec3iHash> m_pendingChunkGenerations;
     std::unordered_map<glm::ivec3, std::future<ChunkMeshData>, Vec3iHash> m_pendingMeshGenerations;
 
-    // ★以下のミューテックスに 'mutable' キーワードを追加
-    mutable std::mutex m_chunkMutex; // チャンクデータへのアクセスを保護するミューテックス
-    mutable std::mutex m_pendingGenMutex; // m_pendingChunkGenerations と m_pendingMeshGenerations へのアクセスを保護するミューテックス
-
+    // ヘルパーメソッド (変更なし)
     glm::ivec3 getChunkCoordFromWorldPos(const glm::vec3 &worldPos) const;
     void loadChunksInArea(const glm::ivec3 &centerChunkCoord);
     void unloadDistantChunks(const glm::ivec3 &centerChunkCoord);
 
+    // OpenGLリソースの更新はメインスレッドで行うためのヘルパー (変更なし)
     void updateChunkRenderData(const glm::ivec3 &chunkCoord, const ChunkMeshData &meshData);
 };
 
