@@ -10,7 +10,7 @@
 #include <vector>
 #include "FontLoader.hpp"
 #include "TextRenderer.hpp"
-#include "opengl_utils.hpp"
+#include "opengl_utils.hpp" // createShaderProgram などが定義されていると仮定
 
 struct ChunkRenderData {
     GLuint VAO = 0;
@@ -66,12 +66,21 @@ public:
     void renderOverlay(int screenWidth, int screenHeight, const std::string &fpsString, const std::string &positionString);
     void endFrame();
 
+    // フォグパラメータを設定する新しいメソッド
+    void setFogParameters(const glm::vec3& color, float start, float end, float density);
+
 private:
     GLuint m_shaderProgram;
     FontData m_fontData;
     TextRenderer m_textRenderer;
     GLuint m_textureID;
     bool loadTexture(const std::string& path);
+
+    // フォグのuniformロケーション
+    GLint m_fogColorLoc;
+    GLint m_fogStartLoc;
+    GLint m_fogEndLoc;
+    GLint m_fogDensityLoc;
 };
 
 #endif // RENDERER_HPP

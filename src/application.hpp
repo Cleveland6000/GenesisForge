@@ -59,7 +59,7 @@ private:
     // World generation constants
     static constexpr int CHUNK_GRID_SIZE = 32;
     static constexpr float NOISE_SCALE = 0.006f;
-    static constexpr int RENDER_DISTANCE_CHUNKS = 2;
+    static constexpr int RENDER_DISTANCE_CHUNKS = 2; // <-- 描画距離を増やしました
     static constexpr unsigned int WORLD_SEED = 12345;
     static constexpr int WORLD_MAX_HEIGHT = 24;
     static constexpr int GROUND_LEVEL = 0;
@@ -70,9 +70,15 @@ private:
     // Frustum culling planes
     std::array<Plane, 6> m_frustumPlanes;
 
+    // フォグ関連のパラメータ
+    glm::vec3 m_fogColor;
+    float m_fogStart;
+    float m_fogEnd;
+    float m_fogDensity; // 指数関数的フォグ用
+
     // Private methods
     void setupCallbacks();
-    bool setupDependenciesAndLoadResources();
+    bool setupDependenciesAndLoadResources(); // このメソッドは提供されたコードにはありませんが、もしあれば更新してください。
     void processInput();
     void update();
     void updateFpsAndPositionStrings();

@@ -9,6 +9,7 @@ out vec3 ourColor;
 out vec2 TexCoord;
 out vec3 Normal;
 out float AO; // <--- フラグメントシェーダーへ渡すAO値
+out vec3 FragPosCameraSpace; // <--- カメラ空間でのフラグメント位置を追加
 
 uniform mat4 model;
 uniform mat4 view;
@@ -17,7 +18,13 @@ uniform mat3 normalMatrix;
 
 void main()
 {
-    gl_Position = projection * view * model * vec4(aPos, 1.0);
+    vec4 worldPos = model * vec4(aPos, 1.0);
+    gl_Position = projection * view * worldPos;
+    
+    // カメラ空間での位置を計算し、フラグメントシェーダーに渡す
+    // フォグの計算には、カメラからの距離が必要なので、カメラ空間での位置が便利
+    FragPosCameraSpace = vec3(view * worldPos); 
+
     ourColor = aColor;
     TexCoord = aTexCoord;
     Normal = normalize(normalMatrix * aNormal);

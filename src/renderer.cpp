@@ -7,7 +7,13 @@
 // 今回はFontLoader.cppなど別のファイルで定義されているか、新しいファイルで定義することを想定し、ここでは定義しません。
 #include "../dependencies/include/stb_image.hpp" // stb_image.h への正しいパスを設定してください
 
-Renderer::Renderer() : m_shaderProgram(0), m_textRenderer(), m_textureID(0) {}
+// opengl_utils.hpp に createShaderProgram が定義されていると仮定
+// もし定義されていなければ、ここで実装するか、適切な場所に移動してください
+extern GLuint createShaderProgram(const std::string& vertexPath, const std::string& fragmentPath);
+
+
+Renderer::Renderer() : m_shaderProgram(0), m_textRenderer(), m_textureID(0),
+                       m_fogColorLoc(-1), m_fogStartLoc(-1), m_fogEndLoc(-1), m_fogDensityLoc(-1) {}
 
 Renderer::~Renderer()
 {
@@ -21,7 +27,10 @@ bool Renderer::initialize(const FontData &fontData)
 {
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
-    m_shaderProgram = createShaderProgram("../shaders/basic.vert", "../shaders/basic.frag");
+    
+    // シェーダーパスを block_vertex_shader.glsl と block_fragment_shader.glsl に変更
+    // 実行ファイルがbuildディレクトリにある場合、src/shaders/への相対パスは ../src/shaders/ となります。
+    m_shaderProgram = createShaderProgram("../shaders/block_vertex_shader.glsl", "../shaders/block_fragment_shader.glsl");
     if (m_shaderProgram == 0)
     {
         std::cerr << "Failed to create shader program for Renderer\n";
@@ -45,6 +54,19 @@ bool Renderer::initialize(const FontData &fontData)
     // ライティング関連のユニフォーム初期値を設定
     glUniform3f(glGetUniformLocation(m_shaderProgram, "lightDir"), 0.5f, -1.0f, 0.5f); // 光源の方向 (例: 右上奥から手前下)
     glUniform1f(glGetUniformLocation(m_shaderProgram, "ambientStrength"), 0.3f); // 環境光の強さ
+
+    // フォグのユニフォームロケーションを取得
+    m_fogColorLoc = glGetUniformLocation(m_shaderProgram, "fogColor");
+    m_fogStartLoc = glGetUniformLocation(m_shaderProgram, "fogStart");
+    m_fogEndLoc = glGetUniformLocation(m_shaderProgram, "fogEnd");
+    m_fogDensityLoc = glGetUniformLocation(m_shaderProgram, "fogDensity");
+
+    // デフォルトのフォグパラメータをシェーダーに設定 (初期化時)
+    // Applicationクラスの初期値と一致させるか、ここでデフォルト値を設定
+    glUniform3f(m_fogColorLoc, 0.5f, 0.5f, 0.7f); // 例: 少し青みがかったグレー
+    glUniform1f(m_fogStartLoc, 50.0f);
+    glUniform1f(m_fogEndLoc, 500.0f);
+    glUniform1f(m_fogDensityLoc, 0.005f);
 
     glUseProgram(0);
 
@@ -133,4 +155,20 @@ void Renderer::renderOverlay(int screenWidth, int screenHeight, const std::strin
 }
 
 void Renderer::endFrame() {
+}
+
+// フォグパラメータ設定メソッドの実装
+void Renderer::setFogParameters(const glm::vec3& color, float start, float end, float density)
+{
+    // シェーダーが使用されていることを確認してからuniformを設定
+    // renderScene内で既にglUseProgram(m_shaderProgram);が呼ばれていることを前提とする
+    // もしrenderSceneの前にsetFogParametersが呼ばれる場合、ここでm_shaderProgram->use()が必要です。
+    // 今回はApplication::render()の呼び出し順序に合わせて、renderSceneの直前に呼び出すため、
+    // renderScene内でuse()されるm_shaderProgramがそのまま有効であると仮定します。
+    glUseProgram(m_shaderProgram); // 念のためここでuse()を呼ぶのが安全
+
+    glUniform3fv(m_fogColorLoc, 1, glm::value_ptr(color));
+    glUniform1f(m_fogStartLoc, start);
+    glUniform1f(m_fogEndLoc, end);
+    glUniform1f(m_fogDensityLoc, density);
 }
