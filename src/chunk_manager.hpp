@@ -59,7 +59,11 @@ private:
 
     // チャンクメッシュ生成ロジックを分離 (非同期で実行される関数)
     // メッシュデータのみを生成し、OpenGLリソースは扱わない
-    ChunkMeshData generateMeshForChunk(const glm::ivec3 &chunkCoord, std::shared_ptr<Chunk> chunk);
+    // 隣接チャンクのデータを直接shared_ptrで受け取るように変更
+    ChunkMeshData generateMeshForChunk(const glm::ivec3 &chunkCoord, std::shared_ptr<Chunk> chunk,
+                                       std::shared_ptr<Chunk> neighbor_neg_x, std::shared_ptr<Chunk> neighbor_pos_x,
+                                       std::shared_ptr<Chunk> neighbor_neg_y, std::shared_ptr<Chunk> neighbor_pos_y,
+                                       std::shared_ptr<Chunk> neighbor_neg_z, std::shared_ptr<Chunk> neighbor_pos_z);
 
     // OpenGLリソースの更新はメインスレッドで行うためのヘルパー
     void updateChunkRenderData(const glm::ivec3 &chunkCoord, const ChunkMeshData &meshData);

@@ -57,7 +57,7 @@ private:
     std::string m_positionString;
 
     // World generation constants
-    static constexpr int CHUNK_GRID_SIZE = 16;
+    static constexpr int CHUNK_GRID_SIZE = 32;
     static constexpr float NOISE_SCALE = 0.006f;
     static constexpr int RENDER_DISTANCE_CHUNKS = 2;
     static constexpr unsigned int WORLD_SEED = 12345;
