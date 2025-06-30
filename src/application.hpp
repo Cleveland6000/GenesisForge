@@ -59,7 +59,7 @@ private:
     // World generation constants
     static constexpr int CHUNK_GRID_SIZE = 16;
     static constexpr float NOISE_SCALE = 0.006f;
-    static constexpr int RENDER_DISTANCE_CHUNKS = 8;
+    static constexpr int RENDER_DISTANCE_CHUNKS = 2;
     static constexpr unsigned int WORLD_SEED = 12345;
     static constexpr int WORLD_MAX_HEIGHT = 24;
     static constexpr int GROUND_LEVEL = 0;

@@ -4,6 +4,8 @@
 #include <memory>
 #include <unordered_map>
 #include <glm/glm.hpp>
+#include <future> // std::future のために追加
+#include <vector> // std::vector のために追加
 #include "chunk/chunk.hpp"
 #include "chunk_mesh_generator.hpp"
 #include "chunk_renderer.hpp"
@@ -14,7 +16,6 @@ struct Vec3iHash
 {
     size_t operator()(const glm::ivec3 &v) const
     {
-        // Y成分もハッシュに含めるように更新
         return std::hash<int>()(v.x) ^ (std::hash<int>()(v.y) << 1) ^ (std::hash<int>()(v.z) << 2);
     }
 };
@@ -22,7 +23,6 @@ struct Vec3iHash
 class ChunkManager
 {
 public:
-    // コンストラクタにY軸方向の描画距離を追加
     ChunkManager(int chunkSize, int renderDistanceXZ, unsigned int noiseSeed, float noiseScale,
                  int worldMaxHeight, int groundLevel, int octaves, float lacunarity, float persistence);
     ~ChunkManager();
@@ -43,12 +43,26 @@ private:
     std::unordered_map<glm::ivec3, std::shared_ptr<Chunk>, Vec3iHash> m_chunks;
     std::unordered_map<glm::ivec3, ChunkRenderData, Vec3iHash> m_chunkRenderData;
 
-    std::shared_ptr<Chunk> generateChunk(const glm::ivec3 &chunkCoord);
-    void updateChunkMesh(const glm::ivec3 &chunkCoord, std::shared_ptr<Chunk> chunk);
+    glm::ivec3 m_lastPlayerChunkCoord; // 最後にプレイヤーがいたチャンク座標
+
+    // 非同期チャンク生成とメッシュ生成を管理するためのマップ
+    std::unordered_map<glm::ivec3, std::future<std::shared_ptr<Chunk>>, Vec3iHash> m_pendingChunkGenerations;
+    std::unordered_map<glm::ivec3, std::future<ChunkMeshData>, Vec3iHash> m_pendingMeshGenerations;
+
+    // ヘルパーメソッド
+    glm::ivec3 getChunkCoordFromWorldPos(const glm::vec3 &worldPos) const;
     void loadChunksInArea(const glm::ivec3 &centerChunkCoord);
     void unloadDistantChunks(const glm::ivec3 &centerChunkCoord);
-    glm::ivec3 getChunkCoordFromWorldPos(const glm::vec3 &worldPos) const;
-    glm::ivec3 m_lastPlayerChunkCoord; // 前回のプレイヤーのチャンク座標
+
+    // チャンク生成ロジックを分離 (非同期で実行される関数)
+    std::shared_ptr<Chunk> generateChunkData(const glm::ivec3 &chunkCoord);
+
+    // チャンクメッシュ生成ロジックを分離 (非同期で実行される関数)
+    // メッシュデータのみを生成し、OpenGLリソースは扱わない
+    ChunkMeshData generateMeshForChunk(const glm::ivec3 &chunkCoord, std::shared_ptr<Chunk> chunk);
+
+    // OpenGLリソースの更新はメインスレッドで行うためのヘルパー
+    void updateChunkRenderData(const glm::ivec3 &chunkCoord, const ChunkMeshData &meshData);
 };
 
 #endif // CHUNK_MANAGER_HPP

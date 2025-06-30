@@ -3,7 +3,8 @@
 #include <chrono>
 #include <algorithm>
 #include <limits>
-#include "chunk_mesh_generator.hpp" // neighborOffsets が定義されるため、このインクルードで解決されます
+#include "chunk_mesh_generator.hpp"
+#include "chunk_renderer.hpp"
 
 // コンストラクタ
 ChunkManager::ChunkManager(int chunkSize, int renderDistanceXZ, unsigned int noiseSeed, float noiseScale,
@@ -21,6 +22,7 @@ ChunkManager::ChunkManager(int chunkSize, int renderDistanceXZ, unsigned int noi
 ChunkManager::~ChunkManager()
 {
     std::cout << "ChunkManager destructor called." << std::endl;
+    // 待機中の非同期タスクがあればキャンセルまたは待機 (今回は簡単のため省略)
     m_chunkRenderData.clear();
 }
 
@@ -31,17 +33,82 @@ void ChunkManager::update(const glm::vec3 &playerPosition)
 
     if (currentChunkCoord != m_lastPlayerChunkCoord)
     {
-        loadChunksInArea(currentChunkCoord);
+        loadChunksInArea(currentChunkCoord); // ここで新しいチャンクの生成も非同期で行われるように変更
         unloadDistantChunks(currentChunkCoord);
         m_lastPlayerChunkCoord = currentChunkCoord;
+    }
 
-        for (auto &pair : m_chunks)
+    // 完了したチャンク生成タスクの結果を処理
+    auto it_chunk_gen = m_pendingChunkGenerations.begin();
+    while (it_chunk_gen != m_pendingChunkGenerations.end())
+    {
+        // future が ready であるかをチェック (is_ready() は C++20 以降)
+        // C++11/14/17 の場合: future.wait_for(std::chrono::seconds(0)) == std::future_status::ready
+        if (it_chunk_gen->second.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
         {
-            if (pair.second->isDirty())
+            glm::ivec3 chunkCoord = it_chunk_gen->first;
+            std::shared_ptr<Chunk> newChunk = it_chunk_gen->second.get(); // 結果を取得
+
+            if (newChunk)
             {
-                updateChunkMesh(pair.first, pair.second);
-                pair.second->setDirty(false);
+                m_chunks[chunkCoord] = newChunk;
+                newChunk->setDirty(true); // 新しいチャンクが生成されたらメッシュ生成が必要
+                
+                // 新しく生成されたチャンクの隣接チャンクをダーティにする
+                for (int i = 0; i < 6; ++i)
+                {
+                    glm::ivec3 offset = neighborOffsets[i];
+                    glm::ivec3 neighborCoord = chunkCoord + offset;
+                    std::shared_ptr<Chunk> neighborChunk = getChunk(neighborCoord);
+                    if (neighborChunk)
+                    {
+                        neighborChunk->setDirty(true);
+                    }
+                }
             }
+            it_chunk_gen = m_pendingChunkGenerations.erase(it_chunk_gen); // 完了したタスクを削除
+        }
+        else
+        {
+            ++it_chunk_gen;
+        }
+    }
+
+    // ダーティなチャンクのメッシュ生成を非同期で開始
+    std::vector<glm::ivec3> chunksToProcessMesh;
+    for (auto &pair : m_chunks)
+    {
+        // 既にメッシュ生成タスクがペンディング中でない、かつダーティなチャンク
+        if (pair.second->isDirty() && m_pendingMeshGenerations.find(pair.first) == m_pendingMeshGenerations.end())
+        {
+            chunksToProcessMesh.push_back(pair.first);
+            pair.second->setDirty(false); // メッシュ生成タスクを開始したらダーティフラグをクリア
+        }
+    }
+
+    for (const auto& chunkCoord : chunksToProcessMesh)
+    {
+        std::shared_ptr<Chunk> chunk = m_chunks[chunkCoord];
+        // generateMeshForChunk を非同期で実行し、結果をマップに保存
+        m_pendingMeshGenerations[chunkCoord] = std::async(std::launch::async,
+                                                         &ChunkManager::generateMeshForChunk, this, chunkCoord, chunk);
+    }
+
+    // 完了したメッシュ生成タスクの結果を処理 (OpenGLリソース更新はメインスレッドで行う)
+    auto it_mesh_gen = m_pendingMeshGenerations.begin();
+    while (it_mesh_gen != m_pendingMeshGenerations.end())
+    {
+        if (it_mesh_gen->second.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
+        {
+            glm::ivec3 chunkCoord = it_mesh_gen->first;
+            ChunkMeshData meshData = it_mesh_gen->second.get(); // 結果を取得
+
+            updateChunkRenderData(chunkCoord, meshData); // OpenGLリソースの更新
+            it_mesh_gen = m_pendingMeshGenerations.erase(it_mesh_gen); // 完了したタスクを削除
+        }
+        else
+        {
+            ++it_mesh_gen;
         }
     }
 }
@@ -63,8 +130,73 @@ std::shared_ptr<Chunk> ChunkManager::getChunk(const glm::ivec3 &chunkCoord)
     return nullptr;
 }
 
-// チャンクを生成して初期化（ボクセルデータを一括設定）
-std::shared_ptr<Chunk> ChunkManager::generateChunk(const glm::ivec3 &chunkCoord)
+// ワールド座標からチャンク座標を計算するヘルパー関数
+glm::ivec3 ChunkManager::getChunkCoordFromWorldPos(const glm::vec3 &worldPos) const
+{
+    return glm::ivec3(std::floor(worldPos.x / m_chunkSize),
+                      std::floor(worldPos.y / m_chunkSize),
+                      std::floor(worldPos.z / m_chunkSize));
+}
+
+// プレイヤーを中心としたエリア内のチャンクをロード（存在しない場合は生成）
+void ChunkManager::loadChunksInArea(const glm::ivec3 &centerChunkCoord)
+{
+    for (int y = -m_renderDistance; y <= m_renderDistance; ++y)
+    {
+        for (int x = -m_renderDistance; x <= m_renderDistance; ++x)
+        {
+            for (int z = -m_renderDistance; z <= m_renderDistance; ++z)
+            {
+                glm::ivec3 chunkCoord = centerChunkCoord + glm::ivec3(x, y, z);
+                // チャンクが存在しない、かつチャンク生成タスクがペンディング中でない場合
+                if (!hasChunk(chunkCoord) && m_pendingChunkGenerations.find(chunkCoord) == m_pendingChunkGenerations.end())
+                {
+                    // generateChunkData を非同期で実行し、結果をマップに保存
+                    m_pendingChunkGenerations[chunkCoord] = std::async(std::launch::async,
+                                                                       &ChunkManager::generateChunkData, this, chunkCoord);
+                }
+            }
+        }
+    }
+}
+
+// 描画距離外に出たチャンクをアンロード
+void ChunkManager::unloadDistantChunks(const glm::ivec3 &centerChunkCoord)
+{
+    std::vector<glm::ivec3> chunksToUnload;
+    for (auto const &[coord, chunk] : m_chunks)
+    {
+        int dist_x = std::abs(coord.x - centerChunkCoord.x);
+        int dist_y = std::abs(coord.y - centerChunkCoord.y);
+        int dist_z = std::abs(coord.z - centerChunkCoord.z);
+
+        if (dist_x > m_renderDistance || dist_y > m_renderDistance || dist_z > m_renderDistance)
+        {
+            chunksToUnload.push_back(coord);
+        }
+    }
+
+    for (const auto &coord : chunksToUnload)
+    {
+        // チャンクがアンロードされるときに、その隣接チャンク（まだ存在する場合）もダーティにする
+        for (int i = 0; i < 6; ++i)
+        {
+            glm::ivec3 offset = neighborOffsets[i];
+            glm::ivec3 neighborCoord = coord + offset;
+            std::shared_ptr<Chunk> neighborChunk = getChunk(neighborCoord);
+            if (neighborChunk)
+            {
+                neighborChunk->setDirty(true);
+            }
+        }
+
+        m_chunkRenderData.erase(coord);
+        m_chunks.erase(coord);
+    }
+}
+
+// チャンクのボクセルデータを生成する (非同期で実行される計算処理)
+std::shared_ptr<Chunk> ChunkManager::generateChunkData(const glm::ivec3 &chunkCoord)
 {
     std::shared_ptr<Chunk> newChunk = std::make_shared<Chunk>(m_chunkSize, chunkCoord);
     if (!m_terrainGenerator)
@@ -110,16 +242,28 @@ std::shared_ptr<Chunk> ChunkManager::generateChunk(const glm::ivec3 &chunkCoord)
             }
         }
     }
-
     newChunk->setVoxels(tempVoxels);
-    newChunk->setDirty(true);
     return newChunk;
 }
 
-// チャンクのメッシュを生成し、レンダリングデータを更新します
-void ChunkManager::updateChunkMesh(const glm::ivec3 &chunkCoord, std::shared_ptr<Chunk> chunk)
+// チャンクのメッシュデータを生成する (非同期で実行される計算処理)
+// OpenGLリソースは扱わない
+ChunkMeshData ChunkManager::generateMeshForChunk(const glm::ivec3 &chunkCoord, std::shared_ptr<Chunk> chunk)
 {
-    // 隣接チャンクを取得
+    if (!chunk)
+    {
+        std::cerr << "Error: Attempted to generate mesh data for a null chunk at "
+                  << chunkCoord.x << ", " << chunkCoord.y << ", " << chunkCoord.z << std::endl;
+        return ChunkMeshData(); // 空のメッシュデータを返す
+    }
+
+    // 隣接チャンクを取得 (メッシュ生成時に必要)
+    // この時点では、隣接チャンクがまだロードされていない可能性があることに注意
+    // または、既にロードされているが、まだメッシュが生成されていない可能性がある
+    // 非同期処理を考慮し、generateMeshForChunk 内での getChunk 呼び出しは注意が必要
+    // 理想的には、generateMeshForChunk に必要な隣接チャンクのボクセルデータを
+    // 引数として渡すか、スナップショットを作成して渡すのがより堅牢
+    // 今回はシンプルにするため、既存の getChunk を使用
     const Chunk *neighbor_neg_x = getChunk(glm::ivec3(chunkCoord.x - 1, chunkCoord.y, chunkCoord.z)).get();
     const Chunk *neighbor_pos_x = getChunk(glm::ivec3(chunkCoord.x + 1, chunkCoord.y, chunkCoord.z)).get();
     const Chunk *neighbor_neg_y = getChunk(glm::ivec3(chunkCoord.x, chunkCoord.y - 1, chunkCoord.z)).get();
@@ -127,91 +271,36 @@ void ChunkManager::updateChunkMesh(const glm::ivec3 &chunkCoord, std::shared_ptr
     const Chunk *neighbor_neg_z = getChunk(glm::ivec3(chunkCoord.x, chunkCoord.y, chunkCoord.z - 1)).get();
     const Chunk *neighbor_pos_z = getChunk(glm::ivec3(chunkCoord.x, chunkCoord.y, chunkCoord.z + 1)).get();
 
-    // ChunkMeshGenerator を使用してメッシュデータを生成します
-    // 隣接チャンクのポインタを渡す
-    ChunkMeshData meshData = ChunkMeshGenerator::generateMesh(
-        *chunk,
-        neighbor_neg_x, neighbor_pos_x,
-        neighbor_neg_y, neighbor_pos_y,
-        neighbor_neg_z, neighbor_pos_z);
-
-    // レンダリングデータを更新します
-    m_chunkRenderData[chunkCoord] = ChunkRenderer::createChunkRenderData(meshData);
+    // ChunkMeshGenerator を使用してメッシュデータを生成
+    ChunkMeshData meshData = ChunkMeshGenerator::generateMesh(*chunk,
+                                                              neighbor_neg_x, neighbor_pos_x,
+                                                              neighbor_neg_y, neighbor_pos_y,
+                                                              neighbor_neg_z, neighbor_pos_z);
+    return meshData;
 }
 
-// 指定された座標範囲内のチャンクをロードします
-void ChunkManager::loadChunksInArea(const glm::ivec3 &centerChunkCoord)
+// OpenGLリソースの更新はメインスレッドで行う
+void ChunkManager::updateChunkRenderData(const glm::ivec3 &chunkCoord, const ChunkMeshData &meshData)
 {
-    for (int x = -m_renderDistance; x <= m_renderDistance; ++x)
+    auto it = m_chunkRenderData.find(chunkCoord);
+    if (it != m_chunkRenderData.end())
     {
-        for (int y = -m_renderDistance; y <= m_renderDistance; ++y)
-        {
-            for (int z = -m_renderDistance; z <= m_renderDistance; ++z)
-            {
-                glm::ivec3 currentChunkCoord = glm::ivec3(centerChunkCoord.x + x, centerChunkCoord.y + y, centerChunkCoord.z + z);
-
-                if (!hasChunk(currentChunkCoord))
-                {
-                    std::shared_ptr<Chunk> newChunk = generateChunk(currentChunkCoord);
-                    m_chunks[currentChunkCoord] = newChunk;
-
-                    // 新しいチャンクがロードされたときに、その隣接チャンク（既に存在する場合）もダーティにする
-                    for (int i = 0; i < 6; ++i)
-                    {
-                        glm::ivec3 offset = neighborOffsets[i];
-                        glm::ivec3 neighborCoord = currentChunkCoord + offset;
-                        std::shared_ptr<Chunk> neighborChunk = getChunk(neighborCoord);
-                        if (neighborChunk)
-                        {
-                            neighborChunk->setDirty(true);
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-// 不要なチャンクをアンロード（描画距離外に出たチャンク）
-void ChunkManager::unloadDistantChunks(const glm::ivec3 &centerChunkCoord)
-{
-    std::vector<glm::ivec3> chunksToUnload;
-    for (auto const &[coord, chunk] : m_chunks)
-    {
-        int dist_x = std::abs(coord.x - centerChunkCoord.x);
-        int dist_y = std::abs(coord.y - centerChunkCoord.y);
-        int dist_z = std::abs(coord.z - centerChunkCoord.z);
-
-        if (dist_x > m_renderDistance || dist_y > m_renderDistance || dist_z > m_renderDistance)
-        {
-            chunksToUnload.push_back(coord);
-        }
+        // 既存のVAO, VBO, EBOを削除
+        if (it->second.VAO != 0) glDeleteVertexArrays(1, &it->second.VAO);
+        if (it->second.VBO != 0) glDeleteBuffers(1, &it->second.VBO);
+        if (it->second.EBO != 0) glDeleteBuffers(1, &it->second.EBO);
+        m_chunkRenderData.erase(it);
     }
 
-    for (const auto &coord : chunksToUnload)
+    // 新しいレンダリングデータを生成
+    if (!meshData.vertices.empty() && !meshData.indices.empty())
     {
-        // チャンクがアンロードされるときに、その隣接チャンク（まだ存在する場合）もダーティにする
-        for (int i = 0; i < 6; ++i)
-        {
-            glm::ivec3 offset = neighborOffsets[i];
-            glm::ivec3 neighborCoord = coord + offset;
-            std::shared_ptr<Chunk> neighborChunk = getChunk(neighborCoord);
-            if (neighborChunk)
-            {
-                neighborChunk->setDirty(true);
-            }
-        }
-
-        m_chunkRenderData.erase(coord);
-        m_chunks.erase(coord);
+        ChunkRenderData renderData = ChunkRenderer::createChunkRenderData(meshData);
+        m_chunkRenderData[chunkCoord] = std::move(renderData);
     }
-}
-
-// ワールド座標からチャンク座標を計算します
-glm::ivec3 ChunkManager::getChunkCoordFromWorldPos(const glm::vec3 &worldPos) const
-{
-    int chunkX = static_cast<int>(std::floor(worldPos.x / m_chunkSize));
-    int chunkY = static_cast<int>(std::floor(worldPos.y / m_chunkSize));
-    int chunkZ = static_cast<int>(std::floor(worldPos.z / m_chunkSize));
-    return glm::ivec3(chunkX, chunkY, chunkZ);
+    else
+    {
+        std::cout << "Generated empty mesh data for chunk "
+                  << chunkCoord.x << ", " << chunkCoord.y << ", " << chunkCoord.z << std::endl;
+    }
 }
