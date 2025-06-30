@@ -27,8 +27,6 @@ const std::array<std::array<unsigned int, 4>, 6> cubeFaceBaseIndices = {
     std::array<unsigned int, 4>{3, 7, 4, 2}  // 5: Top face (Y+)
 };
 
-// neighborOffsets は chunk_mesh_generator.hpp に移動済み
-
 const std::array<glm::vec3, 6> faceNormals = {
     glm::vec3(0.0f, 0.0f, -1.0f), // 0: Back face (Z-)
     glm::vec3(0.0f, 0.0f, 1.0f),  // 1: Front face (Z+)
@@ -45,23 +43,16 @@ const std::array<glm::vec2, 4> faceUVs = {
     glm::vec2(0.0f, 1.0f)  // 左上 (top-left)
 };
 
-inline size_t getVoxelIndex(int x, int y, int z, int chunkSize)
-{
-    if (x < 0 || x >= chunkSize || y < 0 || y >= chunkSize || z < 0 || z >= chunkSize)
-    {
-        // 範囲外のアクセスは安全な値を返す
-        return std::numeric_limits<size_t>::max(); // 無効なインデックス
-    }
-    return static_cast<size_t>(x + y * chunkSize + z * chunkSize * chunkSize);
-}
+// =================================================================================================
+// ChunkMeshGenerator のプライベートヘルパー関数の実装
+// =================================================================================================
 
-// 特定のボクセルの隣接ボクセルを取得するヘルパー関数
-// 隣接チャンクも考慮する
-bool isVoxelSolid(int x, int y, int z, int chunkSize,
-                  const Chunk &currentChunk,
-                  const Chunk *neighbor_neg_x, const Chunk *neighbor_pos_x,
-                  const Chunk *neighbor_neg_y, const Chunk *neighbor_pos_y,
-                  const Chunk *neighbor_neg_z, const Chunk *neighbor_pos_z)
+
+bool ChunkMeshGenerator::isVoxelSolid(int x, int y, int z, int chunkSize,
+                                      const Chunk &currentChunk,
+                                      const Chunk *neighbor_neg_x, const Chunk *neighbor_pos_x,
+                                      const Chunk *neighbor_neg_y, const Chunk *neighbor_pos_y,
+                                      const Chunk *neighbor_neg_z, const Chunk *neighbor_pos_z)
 {
 
     if (x >= 0 && x < chunkSize &&
@@ -69,7 +60,7 @@ bool isVoxelSolid(int x, int y, int z, int chunkSize,
         z >= 0 && z < chunkSize)
     {
         // 現在のチャンク内のボクセル
-        return currentChunk.getVoxels()[getVoxelIndex(x, y, z, chunkSize)];
+        return currentChunk.getVoxels()[ChunkMeshGenerator::getVoxelIndex(x, y, z, chunkSize)];
     }
     else // 隣接チャンクのボクセル
     {
@@ -105,7 +96,7 @@ bool isVoxelSolid(int x, int y, int z, int chunkSize,
         }
         else if (z >= chunkSize)
         {
-            targetChunk = neighbor_pos_z;
+    targetChunk = neighbor_pos_z;
             targetZ = z - chunkSize;
         }
 
@@ -114,20 +105,19 @@ bool isVoxelSolid(int x, int y, int z, int chunkSize,
             targetY >= 0 && targetY < chunkSize &&
             targetZ >= 0 && targetZ < chunkSize)
         {
-            return targetChunk->getVoxels()[getVoxelIndex(targetX, targetY, targetZ, chunkSize)];
+            return targetChunk->getVoxels()[ChunkMeshGenerator::getVoxelIndex(targetX, targetY, targetZ, chunkSize)];
         }
     }
     return false; // 範囲外またはチャンクが存在しない場合はソリッドではないとみなす
 }
 
-// 頂点ごとのアンビエントオクルージョンを計算するヘルパー関数
-float getAmbientOcclusion(int x, int y, int z, int chunkSize,
-                          const Chunk &currentChunk,
-                          const Chunk *neighbor_neg_x, const Chunk *neighbor_pos_x,
-                          const Chunk *neighbor_neg_y, const Chunk *neighbor_pos_y,
-                          const Chunk *neighbor_neg_z, const Chunk *neighbor_pos_z,
-                          float cornerDX, float cornerDY, float cornerDZ,
-                          int faceIndex)
+float ChunkMeshGenerator::calculateAmbientOcclusion(int x, int y, int z, int chunkSize,
+                                                  const Chunk &currentChunk,
+                                                  const Chunk *neighbor_neg_x, const Chunk *neighbor_pos_x,
+                                                  const Chunk *neighbor_neg_y, const Chunk *neighbor_pos_y,
+                                                  const Chunk *neighbor_neg_z, const Chunk *neighbor_pos_z,
+                                                  float cornerDX, float cornerDY, float cornerDZ,
+                                                  int faceIndex)
 {
     int side1_dx = 0, side1_dy = 0, side1_dz = 0;
     int side2_dx = 0, side2_dy = 0, side2_dz = 0;
@@ -189,9 +179,9 @@ float getAmbientOcclusion(int x, int y, int z, int chunkSize,
     }
 
     // 各ボクセルのソリッド状態をチェック
-    bool side1_solid = isVoxelSolid(x + side1_dx, y + side1_dy, z + side1_dz, chunkSize, currentChunk, neighbor_neg_x, neighbor_pos_x, neighbor_neg_y, neighbor_pos_y, neighbor_neg_z, neighbor_pos_z);
-    bool side2_solid = isVoxelSolid(x + side2_dx, y + side2_dy, z + side2_dz, chunkSize, currentChunk, neighbor_neg_x, neighbor_pos_x, neighbor_neg_y, neighbor_pos_y, neighbor_neg_z, neighbor_pos_z);
-    bool corner_solid = isVoxelSolid(x + corner_dx, y + corner_dy, z + corner_dz, chunkSize, currentChunk, neighbor_neg_x, neighbor_pos_x, neighbor_neg_y, neighbor_pos_y, neighbor_neg_z, neighbor_pos_z);
+    bool side1_solid = ChunkMeshGenerator::isVoxelSolid(x + side1_dx, y + side1_dy, z + side1_dz, chunkSize, currentChunk, neighbor_neg_x, neighbor_pos_x, neighbor_neg_y, neighbor_pos_y, neighbor_neg_z, neighbor_pos_z);
+    bool side2_solid = ChunkMeshGenerator::isVoxelSolid(x + side2_dx, y + side2_dy, z + side2_dz, chunkSize, currentChunk, neighbor_neg_x, neighbor_pos_x, neighbor_neg_y, neighbor_pos_y, neighbor_neg_z, neighbor_pos_z);
+    bool corner_solid = ChunkMeshGenerator::isVoxelSolid(x + corner_dx, y + corner_dy, z + corner_dz, chunkSize, currentChunk, neighbor_neg_x, neighbor_pos_x, neighbor_neg_y, neighbor_pos_y, neighbor_neg_z, neighbor_pos_z);
 
     // 0fps のAO値を計算
     if (side1_solid && side2_solid && corner_solid)
@@ -212,6 +202,92 @@ float getAmbientOcclusion(int x, int y, int z, int chunkSize,
     }
 }
 
+glm::vec2 ChunkMeshGenerator::transformUV(const glm::vec2& uv, int rotationAmount, bool flipHorizontal)
+{
+    glm::vec2 transformedUV = uv;
+
+    // まず回転を適用
+    switch (rotationAmount)
+    {
+    case 1: // 90度回転 (反時計回り)
+        transformedUV = glm::vec2(1.0f - uv.y, uv.x);
+        break;
+    case 2: // 180度回転
+        transformedUV = glm::vec2(1.0f - uv.x, 1.0f - uv.y);
+        break;
+    case 3: // 270度回転 (反時計回り)
+        transformedUV = glm::vec2(uv.y, 1.0f - uv.x);
+        break;
+    default: // 0度回転 (case 0)
+        // 何もしない
+        break;
+    }
+
+    // 次に水平反転を適用 (U座標のみ反転)
+    if (flipHorizontal)
+    {
+        transformedUV.x = 1.0f - transformedUV.x;
+    }
+    return transformedUV;
+}
+
+void ChunkMeshGenerator::addFaceToMeshData(ChunkMeshData& meshData, int x, int y, int z, int faceIndex,
+                                          int rotationAmount, bool flipHorizontal, int chunkSize,
+                                          const Chunk &currentChunk,
+                                          const Chunk *neighbor_neg_x, const Chunk *neighbor_pos_x,
+                                          const Chunk *neighbor_neg_y, const Chunk *neighbor_pos_y,
+                                          const Chunk *neighbor_neg_z, const Chunk *neighbor_pos_z)
+{
+    size_t currentVertexCount = meshData.vertices.size();
+    glm::vec3 currentFaceNormal = faceNormals[faceIndex];
+
+    for (int v_idx = 0; v_idx < 4; ++v_idx) // 4つの頂点についてループ
+    {
+        unsigned int baseIdx = cubeFaceBaseIndices[faceIndex][v_idx];
+        Vertex baseVertex = baseCubeVertices[baseIdx];
+
+        Vertex newVertex = baseVertex;
+        newVertex.x += x;
+        newVertex.y += y;
+        newVertex.z += z;
+
+        // ここで元のUV座標を取得し、変換関数を適用
+        glm::vec2 uv = ChunkMeshGenerator::transformUV(faceUVs[v_idx], rotationAmount, flipHorizontal);
+
+        newVertex.u = uv.x;
+        newVertex.v = uv.y;
+
+        newVertex.nx = currentFaceNormal.x;
+        newVertex.ny = currentFaceNormal.y;
+        newVertex.nz = currentFaceNormal.z;
+
+        // AO値を計算して設定
+        newVertex.ao = ChunkMeshGenerator::calculateAmbientOcclusion(x, y, z, chunkSize,
+                                                           currentChunk,
+                                                           neighbor_neg_x, neighbor_pos_x,
+                                                           neighbor_neg_y, neighbor_pos_y,
+                                                           neighbor_neg_z, neighbor_pos_z,
+                                                           baseVertex.x, baseVertex.y, baseVertex.z,
+                                                           faceIndex);
+
+        meshData.vertices.push_back(newVertex);
+    }
+
+    // インデックスは常に同じ順序
+    meshData.indices.push_back(static_cast<unsigned int>(currentVertexCount) + 0);
+    meshData.indices.push_back(static_cast<unsigned int>(currentVertexCount) + 1);
+    meshData.indices.push_back(static_cast<unsigned int>(currentVertexCount) + 2);
+
+    meshData.indices.push_back(static_cast<unsigned int>(currentVertexCount) + 0);
+    meshData.indices.push_back(static_cast<unsigned int>(currentVertexCount) + 2);
+    meshData.indices.push_back(static_cast<unsigned int>(currentVertexCount) + 3);
+}
+
+
+// =================================================================================================
+// ChunkMeshGenerator::generateMesh の実装
+// =================================================================================================
+
 ChunkMeshData ChunkMeshGenerator::generateMesh(const Chunk &chunk,
                                                const Chunk *neighbor_neg_x,
                                                const Chunk *neighbor_pos_x,
@@ -224,21 +300,15 @@ ChunkMeshData ChunkMeshGenerator::generateMesh(const Chunk &chunk,
     int chunkSize = chunk.getSize();
     const std::vector<bool> &voxels = chunk.getVoxels();
 
-    // チャンクのワールド座標を取得（ChunkクラスにgetCoord()メソッドがあると仮定）
-    // もしChunkクラスにgetCoord()がない場合は、引数として渡すか、別の方法でチャンクのユニークな識別子を取得してください。
     glm::ivec3 chunkCoord = chunk.getCoord();
 
-    // チャンクの座標をシードとして使用することで、同じチャンクは常に同じ乱数パターンを生成します。
-    // 座標が負になる可能性があるので、大きな素数で乗算して衝突を減らします。
     std::seed_seq seed_seq{
         static_cast<std::uint32_t>(chunkCoord.x),
         static_cast<std::uint32_t>(chunkCoord.y),
         static_cast<std::uint32_t>(chunkCoord.z)};
     std::mt19937 rng(seed_seq);
 
-    // 回転用: 0=0deg, 1=90deg, 2=180deg, 3=270deg
     std::uniform_int_distribution<int> rotation_dist(0, 3);
-    // 反転用: 0=反転なし, 1=水平反転
     std::uniform_int_distribution<int> flip_dist(0, 1);
 
     meshData.vertices.reserve(chunkSize * chunkSize * chunkSize * 4 * 6);
@@ -250,15 +320,8 @@ ChunkMeshData ChunkMeshGenerator::generateMesh(const Chunk &chunk,
         {
             for (int x = 0; x < chunkSize; ++x)
             {
-                // ここでボクセルの種類を考慮し、草ブロックの場合のみUVを回転・反転させるといった制御も可能
-                // if (voxels[getVoxelIndex(x, y, z, chunkSize)] && chunk.getVoxelType(x,y,z) == BlockType::GRASS) { ... }
-                if (voxels[getVoxelIndex(x, y, z, chunkSize)])
+                if (ChunkMeshGenerator::getVoxelValue(x, y, z, chunkSize, voxels))
                 {
-                    size_t currentVertexCount = meshData.vertices.size();
-
-                    // このボクセルに適用するUV回転パターンと反転パターンをランダムに決定
-                    // ボクセルごとに同じパターンが適用されるように、面ループの外で決定
-                    // AOの計算もこのボクセルに対して行われるため、ボクセルごとの乱数で問題ありません。
                     int rotationAmount = rotation_dist(rng);
                     bool flipHorizontal = (flip_dist(rng) == 1);
 
@@ -269,86 +332,17 @@ ChunkMeshData ChunkMeshGenerator::generateMesh(const Chunk &chunk,
                         int neighborY = y + offset.y;
                         int neighborZ = z + offset.z;
 
-                        bool renderFace = true;
-                        if (isVoxelSolid(neighborX, neighborY, neighborZ, chunkSize,
-                                         chunk,
-                                         neighbor_neg_x, neighbor_pos_x,
-                                         neighbor_neg_y, neighbor_pos_y,
-                                         neighbor_neg_z, neighbor_pos_z))
+                        if (!ChunkMeshGenerator::isVoxelSolid(neighborX, neighborY, neighborZ, chunkSize,
+                                                               chunk, neighbor_neg_x, neighbor_pos_x,
+                                                               neighbor_neg_y, neighbor_pos_y,
+                                                               neighbor_neg_z, neighbor_pos_z))
                         {
-                            renderFace = false; // 隣接ボクセルがソリッドなので、この面は描画不要
-                        }
-
-                        if (renderFace)
-                        {
-                            glm::vec3 currentFaceNormal = faceNormals[i];
-
-                            for (int v_idx = 0; v_idx < 4; ++v_idx) // 4つの頂点についてループ
-                            {
-                                unsigned int baseIdx = cubeFaceBaseIndices[i][v_idx];
-                                Vertex baseVertex = baseCubeVertices[baseIdx];
-
-                                Vertex newVertex = baseVertex;
-                                newVertex.x += x;
-                                newVertex.y += y;
-                                newVertex.z += z;
-
-                                // ここで元のUV座標を取得
-                                glm::vec2 uv = faceUVs[v_idx];
-
-                                // まず回転を適用
-                                switch (rotationAmount)
-                                {
-                                case 1: // 90度回転 (反時計回り)
-                                    uv = glm::vec2(1.0f - uv.y, uv.x);
-                                    break;
-                                case 2: // 180度回転
-                                    uv = glm::vec2(1.0f - uv.x, 1.0f - uv.y);
-                                    break;
-                                case 3: // 270度回転 (反時計回り)
-                                    uv = glm::vec2(uv.y, 1.0f - uv.x);
-                                    break;
-                                default: // 0度回転 (case 0)
-                                    // 何もしない
-                                    break;
-                                }
-
-                                // 次に水平反転を適用 (U座標のみ反転)
-                                if (flipHorizontal)
-                                {
-                                    uv.x = 1.0f - uv.x;
-                                }
-                                // 必要であれば垂直反転 (uv.y = 1.0f - uv.y;) も追加可能
-
-                                newVertex.u = uv.x;
-                                newVertex.v = uv.y;
-
-                                newVertex.nx = currentFaceNormal.x;
-                                newVertex.ny = currentFaceNormal.y;
-                                newVertex.nz = currentFaceNormal.z;
-
-                                // AO値を計算して設定
-                                newVertex.ao = getAmbientOcclusion(x, y, z, chunkSize,
-                                                                   chunk,
-                                                                   neighbor_neg_x, neighbor_pos_x,
-                                                                   neighbor_neg_y, neighbor_pos_y,
-                                                                   neighbor_neg_z, neighbor_pos_z,
-                                                                   baseVertex.x, baseVertex.y, baseVertex.z,
-                                                                   i);
-
-                                meshData.vertices.push_back(newVertex);
-                            }
-
-                            // インデックスは常に同じ順序
-                            meshData.indices.push_back(static_cast<unsigned int>(currentVertexCount) + 0);
-                            meshData.indices.push_back(static_cast<unsigned int>(currentVertexCount) + 1);
-                            meshData.indices.push_back(static_cast<unsigned int>(currentVertexCount) + 2);
-
-                            meshData.indices.push_back(static_cast<unsigned int>(currentVertexCount) + 0);
-                            meshData.indices.push_back(static_cast<unsigned int>(currentVertexCount) + 2);
-                            meshData.indices.push_back(static_cast<unsigned int>(currentVertexCount) + 3);
-
-                            currentVertexCount += 4;
+                            // 面の追加ロジックをヘルパー関数に抽出
+                            ChunkMeshGenerator::addFaceToMeshData(meshData, x, y, z, i, rotationAmount, flipHorizontal,
+                                                                  chunkSize, chunk,
+                                                                  neighbor_neg_x, neighbor_pos_x,
+                                                                  neighbor_neg_y, neighbor_pos_y,
+                                                                  neighbor_neg_z, neighbor_pos_z);
                         }
                     }
                 }
