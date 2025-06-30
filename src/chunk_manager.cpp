@@ -6,6 +6,7 @@
 // chunk_mesh_generator.hpp は ChunkProcessor でのみ使用されるため、ここからは削除可能
 // chunk_renderer.hpp は updateChunkRenderData で使用するため残す
 #include "chunk_renderer.hpp"
+#include "ThreadPool.hpp"
 
 // コンストラクタ
 ChunkManager::ChunkManager(int chunkSize, int renderDistanceXZ, unsigned int noiseSeed, float noiseScale,
@@ -16,7 +17,7 @@ ChunkManager::ChunkManager(int chunkSize, int renderDistanceXZ, unsigned int noi
                                                         std::make_unique<TerrainGenerator>(noiseSeed, noiseScale,
                                                                                            worldMaxHeight, groundLevel,
                                                                                            octaves, lacunarity, persistence))),
-      m_lastPlayerChunkCoord(std::numeric_limits<int>::max())
+      m_lastPlayerChunkCoord(std::numeric_limits<int>::max()), m_threadPool(std::make_unique<ThreadPool>(5))
 {
     std::cout << "ChunkManager constructor called. ChunkSize: " << m_chunkSize
               << ", RenderDistance: " << m_renderDistance << std::endl;
@@ -75,7 +76,6 @@ void ChunkManager::update(const glm::vec3 &playerPosition)
             ++it_chunk_gen;
         }
     }
-
     // ダーティなチャンクのメッシュ生成を非同期で開始
     std::vector<glm::ivec3> chunksToProcessMesh;
     for (auto &pair : m_chunks)
@@ -93,11 +93,16 @@ void ChunkManager::update(const glm::vec3 &playerPosition)
 
         // ChunkProcessor の generateMeshForChunk を非同期で実行
         // this を NeighborChunkProvider* として渡す
-        m_pendingMeshGenerations[chunkCoord] = std::async(std::launch::async,
-                                                          &ChunkProcessor::generateMeshForChunk,
-                                                          m_chunkProcessor.get(),   // ChunkProcessor のインスタンス
-                                                          chunkCoord, chunk, this); // this は NeighborChunkProvider*
+
+        std::cout << "AAA" << std::endl;
+        m_pendingMeshGenerations[chunkCoord] = m_threadPool->enqueue(
+            &ChunkProcessor::generateMeshForChunk,
+            m_chunkProcessor.get(),   // ChunkProcessor のインスタンス
+            chunkCoord, chunk, this); // this は NeighborChunkProvider*
+
+        std::cout << "SSS" << std::endl;
     }
+    std::cout << "BBB" << std::endl;
 
     // 完了したメッシュ生成タスクの結果を処理 (OpenGLリソース更新はメインスレッドで行う)
     const int MAX_MESH_UPDATES_PER_FRAME = 1;

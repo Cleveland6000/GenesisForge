@@ -10,7 +10,9 @@
 #include "chunk_mesh_generator.hpp" // ChunkMeshData の定義のため
 #include "chunk_renderer.hpp"
 #include "terrain_generator.hpp" // ChunkProcessor のコンストラクタに渡すため
-#include "chunk_processor.hpp" // 新しいクラスをインクルード
+#include "chunk_processor.hpp"   // 新しいクラスをインクルード
+#include "ThreadPool.hpp" 
+
 
 // チャンクのワールド座標をキーとするハッシュ関数 (変更なし)
 struct Vec3iHash
@@ -42,7 +44,7 @@ private:
 
     // TerrainGenerator は ChunkProcessor に移動
     std::unique_ptr<ChunkProcessor> m_chunkProcessor; // ChunkProcessor のインスタンスを持つ
-
+    std::unique_ptr<ThreadPool> m_threadPool;
     std::unordered_map<glm::ivec3, std::shared_ptr<Chunk>, Vec3iHash> m_chunks;
     std::unordered_map<glm::ivec3, ChunkRenderData, Vec3iHash> m_chunkRenderData;
 
