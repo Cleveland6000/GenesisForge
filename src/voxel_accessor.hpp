@@ -1,12 +1,9 @@
 #ifndef VOXEL_ACCESSOR_HPP
 #define VOXEL_ACCESSOR_HPP
 
-#include "chunk/chunk.hpp"
+#include "chunk/chunk.hpp" // Chunkクラスの定義のため
 #include <vector>
 #include <limits> // std::numeric_limits のために追加
-
-// 隣接チャンクのオフセットをVoxelAccessorの内部に移動、あるいは引き続きグローバルで管理することも可能
-// ここではChunkMeshGeneratorが使用するため、neighborOffsetsはChunkMeshGenerator.hppに残します。
 
 class VoxelAccessor
 {
